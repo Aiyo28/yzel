@@ -1,5 +1,31 @@
 # TODO — Yzel (Узел)
 
+## Phase 1b — Pivot (post 2026-04-17 grill)
+
+> Restructured product+GTM after grill session. Supersedes launch tasks below for now.
+> See BRIEF.md D13–D16 for decisions.
+
+### Connector Portfolio Extension
+- [ ] Implement Telegram connector (MIT) — Bot API + MTProto consideration
+- [ ] Implement Email/IMAP connector (MIT) — IMAP4rev1 + OAuth2 for Gmail/Yandex
+- [ ] Design `WhatsAppConnector` interface — wacli (free) + BSP adapter (paid, deferred)
+- [ ] Wire wacli as sidecar subprocess per tenant (not library import)
+- [ ] Write mock servers for Telegram/Email/WhatsApp (mirror existing mock pattern)
+- [ ] Add integration tests for new connectors
+
+### AIYO OS Cloud SaaS
+- [ ] Landing page draft — mid-upper RU-speaking ICP ($5–50M revenue)
+- [ ] Pricing page: $49–$499/seat/mo tiers + $30–50K lighthouse implementation
+- [ ] Trade-secret engine architecture doc (server-only: matcher, query planner, context graph, audit)
+- [ ] Decide domain: aiyo.kz vs aiyo-os.com vs separate
+- [ ] Reach out to Zhenis Uzakbayev with lighthouse pilot proposal (Atyrau O&G)
+- [ ] Case-study template (populate from lighthouse pilot)
+- [ ] SOW template for $30–50K lighthouse implementation
+
+### Validation / Risk Research
+- [ ] 1C AI roadmap research — scan Infostart, partner network, official conferences
+- [ ] Manual test pass on existing 4 mock servers → docs/TESTING.md
+
 ## Phase 1 — Foundation
 
 ### Setup
