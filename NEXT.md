@@ -1,9 +1,9 @@
 # Next
 
 ## Next Session — Priority Order
-1. **Rewrite MASTERPLAN.md** collaboratively (post-pivot strategic refresh — old version still has uncommitted pre-grill edits)
-2. **Start Telegram connector** (MIT) — Bot API first
-3. Zhenis lighthouse outreach = verbal, user-handled (not in repo workflow)
+1. **Rewrite MASTERPLAN.md** collaboratively. Locked from 2026-04-18 grill: ICP=B (mid-upper RU-speaking ops, $5–50M); AIYO OS architecture = Option 1 (Yzel OSS + AIYO OS closed SaaS); WhatsApp dropped from Phase 1; C parked as fallback only.
+2. **Source new lighthouse prospect.** Zhenis/Atyrau O&G removed by user 2026-04-18. B has no confirmed warm intro now. Either find another warm path (network mining) or commit to cold outbound — both must be grilled before MASTERPLAN rewrite finishes.
+3. **Start Telegram connector** (MIT) — Bot API first.
 
 ## Continue
 - [ ] Add Telegram connector (MIT)
@@ -19,6 +19,8 @@
 - 1C VM / real-1C integration test — move to Phase 2
 - JWT enterprise license (D10) — superseded by topological moat: server-only engine, no license to enforce
 - AmoCRM / Bitrix24 / Moysklad growth marketing — keep code, defer effort
+- WhatsApp connector (wacli + BSP) — dropped from Phase 1 per 2026-04-18 grill; ICP B uses Telegram for biz, not WhatsApp
+- ICP C (1–10 person AI-native founders) — parked as fallback if B fails by month 9
 
 ## Decide
 - Lighthouse pilot price point: $30K vs $50K one-time implementation
