@@ -23,6 +23,20 @@ Russian SMBs run 3-4 disconnected business tools (1C for accounting, Bitrix24 fo
 
 The gap: **nobody has built the unified cross-system integration layer.**
 
+## Problem→Solution Chain
+
+- **Problem:** CIS business tools are data silos, AI can't access them without expensive custom integration
+- → **Solution:** Open-source MCP connectors with unified auth + dynamic schema discovery
+- → **New problem:** Individual connectors don't talk to each other — cross-system queries need an orchestration layer
+- → **Solution:** Enterprise platform layer (BSL-licensed) that unifies queries across connectors
+
+## Not This
+
+- Not a replacement for 1C, Bitrix24, or any existing business tool — connectors only, never operational logic
+- Not a data warehouse or ETL pipeline — real-time MCP queries, not batch sync
+- Not a UI product (Phase 1) — developer infrastructure first, dashboard later
+- Not for non-CIS markets — Russian business tool ecosystem only
+
 ## The Vision
 
 A 1C integrator installs Yzel once for a client. Suddenly their client's AI assistant can answer: "Show me client Рога и Копыта's outstanding invoices from 1C, their open deals in AmoCRM, and their current inventory levels in Moysklad" — in one query, with one authentication.
