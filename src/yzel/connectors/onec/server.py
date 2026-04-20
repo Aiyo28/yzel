@@ -18,7 +18,7 @@ from yzel.core.discovery import discover_schema
 from yzel.core.types import OneCCredential, SchemaEntity
 from yzel.core.vault import CredentialVault
 
-from .odata import OneCODataClient
+from .odata import OneCError, OneCODataClient
 
 server = Server("yzel-1c")
 
@@ -103,43 +103,122 @@ async def list_tools() -> list[Tool]:
                 "required": ["entity"],
             },
         ),
+        Tool(
+            name="onec_count",
+            description="Подсчитать количество записей в объекте 1С",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entity": {"type": "string", "description": "Имя объекта OData"},
+                    "filter": {"type": "string", "description": "OData $filter выражение"},
+                },
+                "required": ["entity"],
+            },
+        ),
+        Tool(
+            name="onec_create",
+            description="Создать новую запись в 1С",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entity": {"type": "string", "description": "Имя объекта OData"},
+                    "data": {"type": "object", "description": "Поля новой записи"},
+                },
+                "required": ["entity", "data"],
+            },
+        ),
+        Tool(
+            name="onec_update",
+            description="Обновить существующую запись в 1С (PATCH)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entity": {"type": "string", "description": "Имя объекта OData"},
+                    "key": {"type": "string", "description": "GUID записи"},
+                    "data": {"type": "object", "description": "Изменяемые поля"},
+                },
+                "required": ["entity", "key", "data"],
+            },
+        ),
+        Tool(
+            name="onec_delete",
+            description="Пометить запись на удаление в 1С (устанавливает DeletionMark)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entity": {"type": "string", "description": "Имя объекта OData"},
+                    "key": {"type": "string", "description": "GUID записи"},
+                },
+                "required": ["entity", "key"],
+            },
+        ),
     ]
+
+
+def _as_text(payload: Any) -> list[TextContent]:
+    return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]
 
 
 @server.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     """Handle tool calls."""
-    client = await _ensure_client()
+    try:
+        client = await _ensure_client()
 
-    if name == "onec_list_entities":
-        entity_names = [e.entity_name for e in _schema]
-        return [TextContent(type="text", text=json.dumps(entity_names, ensure_ascii=False, indent=2))]
+        if name == "onec_list_entities":
+            return _as_text([e.entity_name for e in _schema])
 
-    elif name == "onec_query":
-        results = await client.get_entity_list(
-            entity=arguments["entity"],
-            top=arguments.get("top", 20),
-            filter_expr=arguments.get("filter"),
-            select=arguments.get("select"),
-        )
-        return [TextContent(type="text", text=json.dumps(results, ensure_ascii=False, indent=2))]
+        if name == "onec_query":
+            results = await client.get_entity_list(
+                entity=arguments["entity"],
+                top=arguments.get("top", 20),
+                filter_expr=arguments.get("filter"),
+                select=arguments.get("select"),
+            )
+            return _as_text(results)
 
-    elif name == "onec_get":
-        result = await client.get_entity(arguments["entity"], arguments["key"])
-        if result is None:
-            return [TextContent(type="text", text="Запись не найдена")]
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+        if name == "onec_get":
+            result = await client.get_entity(arguments["entity"], arguments["key"])
+            if result is None:
+                return [TextContent(type="text", text="Запись не найдена")]
+            return _as_text(result)
 
-    elif name == "onec_schema":
-        entity_name = arguments["entity"]
-        matching = [e for e in _schema if e.entity_name == entity_name]
-        if not matching:
-            return [TextContent(type="text", text=f"Объект '{entity_name}' не найден в метаданных")]
-        schema = matching[0]
-        fields = [{"name": f.name, "type": f.field_type, "nullable": f.nullable} for f in schema.fields]
-        return [TextContent(type="text", text=json.dumps(fields, ensure_ascii=False, indent=2))]
+        if name == "onec_schema":
+            entity_name = arguments["entity"]
+            matching = [e for e in _schema if e.entity_name == entity_name]
+            if not matching:
+                return [
+                    TextContent(type="text", text=f"Объект '{entity_name}' не найден в метаданных")
+                ]
+            schema = matching[0]
+            return _as_text(
+                [{"name": f.name, "type": f.field_type, "nullable": f.nullable} for f in schema.fields]
+            )
 
-    return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
+        if name == "onec_count":
+            total = await client.count_entities(
+                arguments["entity"], filter_expr=arguments.get("filter")
+            )
+            return [TextContent(type="text", text=str(total))]
+
+        if name == "onec_create":
+            created = await client.create_entity(arguments["entity"], arguments["data"])
+            return _as_text(created)
+
+        if name == "onec_update":
+            updated = await client.update_entity(
+                arguments["entity"], arguments["key"], arguments["data"]
+            )
+            return _as_text(updated)
+
+        if name == "onec_delete":
+            await client.delete_entity(arguments["entity"], arguments["key"])
+            return [TextContent(type="text", text="Запись помечена на удаление")]
+
+        return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
+
+    except OneCError as exc:
+        return [TextContent(type="text", text=f"Ошибка 1С: {exc.message}")]
 
 
 async def main() -> None:
