@@ -11,9 +11,9 @@ Yzel = **not-for-profit OSS** MCP connector portfolio. No sale, no paid tier, no
 - [x] Ozon Seller API — dual-header auth, sandbox overridable, 11 MCP tools, 15 tests (commit `a2f660c`)
 
 ## Tier 2 — Already-scaffolded + adjacent (next)
-- [ ] Finish Bitrix24 — scaffolded, audit + close gaps (rate-limit cases, pagination helpers, webhook refresh guard)
+- [x] Finish Bitrix24 — unified error wrapping (4xx/5xx → Bitrix24Error with `status_code`), MCP server catches Bitrix24Error → RU text, 1 new test 2026-04-20
 - [x] Finish AmoCRM — 3-month silent-death guard shipped: `refresh_token_updated_at` tracked, `days_since_refresh()` / `days_until_refresh_expiry()` / `ensure_refresh_fresh(min_remaining_days)` methods, 5 new tests 2026-04-20
-- [ ] Finish Moysklad — scaffolded, audit + close gaps (expand handling, entity relationships)
+- [x] Finish Moysklad — added RateLimiter (5 rps default), unified `_parse_moysklad_error` (no more httpx leaks on 4xx without errors[]), MoyskladError carries `status_code`, MCP server catches MoyskladError → RU text, 3 new tests 2026-04-20
 - [x] Telegram Bot API — 12 MCP tools, TelegramError with retry_after, 13 tests 2026-04-20
 - [x] iiko (F&B POS) — apiLogin→1h Bearer, auto-refresh on 401, 9 MCP tools (organizations, terminal_groups, nomenclature, stop_list, deliveries by phone, create_delivery, order/payment types, employees), 15 tests 2026-04-20
 - [ ] Reintroduce WhatsApp via wacli sidecar — reference `github.com/steipete/wacli`

@@ -64,20 +64,30 @@ class Bitrix24Client:
             Full response dict with 'result', optionally 'total' and 'next'.
 
         Raises:
-            httpx.HTTPStatusError: On non-2xx response.
-            Bitrix24Error: On Bitrix24 application-level error.
+            Bitrix24Error: On any non-2xx response or on a 200-with-error body.
         """
         await self._limiter.acquire()
         url = f"{self._base_url}/{method}.json"
         client = await self._get_client()
         response = await client.post(url, json=params or {})
-        response.raise_for_status()
 
-        data = response.json()
-        if "error" in data:
+        # Parse body defensively — Bitrix returns error envelopes at several
+        # different HTTP statuses (200 with error field, 400, 401, 403, 404,
+        # 429 without Retry-After). All collapse into Bitrix24Error here.
+        try:
+            data = response.json()
+        except ValueError:
+            data = {}
+
+        if response.status_code >= 400 or (isinstance(data, dict) and "error" in data):
+            code = str((data or {}).get("error") or response.status_code)
+            description = (data or {}).get("error_description") or (
+                response.text[:200] or response.reason_phrase
+            )
             raise Bitrix24Error(
-                code=data["error"],
-                description=data.get("error_description", ""),
+                code=code,
+                description=description,
+                status_code=response.status_code,
             )
         return data
 
@@ -243,9 +253,10 @@ class Bitrix24Client:
 
 
 class Bitrix24Error(Exception):
-    """Bitrix24 application-level error."""
+    """Bitrix24 error — unified across HTTP-level (4xx/5xx) and app-level failures."""
 
-    def __init__(self, code: str, description: str) -> None:
+    def __init__(self, code: str, description: str, status_code: int = 200) -> None:
         self.code = code
         self.description = description
-        super().__init__(f"Bitrix24 error [{code}]: {description}")
+        self.status_code = status_code
+        super().__init__(f"Bitrix24 error [{status_code}/{code}]: {description}")

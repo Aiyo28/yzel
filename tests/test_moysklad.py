@@ -9,7 +9,7 @@ import httpx
 import pytest
 import uvicorn
 
-from yzel.connectors.moysklad.client import MoyskladClient, MoyskladError
+from yzel.connectors.moysklad.client import MoyskladClient, MoyskladError, RateLimiter
 
 from tests.mock_moysklad_server import VALID_TOKEN, app
 
@@ -204,3 +204,44 @@ async def test_not_found_entity(client: MoyskladClient) -> None:
     """Getting non-existent entity returns error."""
     with pytest.raises(MoyskladError, match="не найден"):
         await client.get_counterparty("00000000-0000-0000-0000-000000000000")
+
+
+async def test_error_carries_status_code(mock_server: str) -> None:
+    """MoyskladError records the HTTP status code (for monitoring/dashboards)."""
+    bad = MoyskladClient(bearer_token="x" * 20, base_url=mock_server)  # noqa: S106
+    try:
+        with pytest.raises(MoyskladError) as exc:
+            await bad.get_counterparties()
+        assert exc.value.status_code in (401, 403)
+    finally:
+        await bad.close()
+
+
+async def test_error_wraps_non_errors_body(mock_server: str, monkeypatch) -> None:
+    """A 4xx response without an `errors[]` envelope still surfaces as MoyskladError."""
+    import httpx
+
+    # Swap in a transport that returns a bare 500 with no body
+    async def fake_request(self, method, url, **kwargs):
+        return httpx.Response(500, request=httpx.Request(method, url))
+
+    client = MoyskladClient(bearer_token="test", base_url=mock_server)
+    try:
+        monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
+        with pytest.raises(MoyskladError) as exc:
+            await client.get_counterparties()
+        assert exc.value.status_code == 500
+    finally:
+        await client.close()
+
+
+async def test_rate_limiter_enforces_interval() -> None:
+    """Moysklad RateLimiter ensures the configured minimum interval."""
+    import time
+
+    limiter = RateLimiter(max_per_second=20.0)  # 50ms
+    start = time.monotonic()
+    await limiter.acquire()
+    await limiter.acquire()
+    await limiter.acquire()
+    assert time.monotonic() - start >= 0.09

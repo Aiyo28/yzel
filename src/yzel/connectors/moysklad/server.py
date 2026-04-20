@@ -17,7 +17,7 @@ from mcp.types import TextContent, Tool
 from yzel.core.types import MoyskladCredential
 from yzel.core.vault import CredentialVault
 
-from .client import MoyskladClient
+from .client import MoyskladClient, MoyskladError
 
 server = Server("yzel-moysklad")
 
@@ -228,66 +228,77 @@ async def list_tools() -> list[Tool]:
     ]
 
 
+def _as_text(payload: Any) -> list[TextContent]:
+    return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]
+
+
 @server.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     """Handle tool calls."""
-    client = await _ensure_client()
+    try:
+        client = await _ensure_client()
 
-    if name == "moysklad_list":
-        entity_type = arguments["entity"]
-        meta = _ENTITY_TYPES[entity_type]
-        method = getattr(client, meta["list_method"])
-        result = await method(
-            limit=arguments.get("limit"),
-            offset=arguments.get("offset"),
-            filter_expr=arguments.get("filter"),
-            search=arguments.get("search"),
-            expand=arguments.get("expand"),
-            **({} if entity_type != "customerorder" else {"order": arguments.get("order")}),
-        )
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
-
-    elif name == "moysklad_get":
-        entity_type = arguments["entity"]
-        meta = _ENTITY_TYPES[entity_type]
-        method = getattr(client, meta["get_method"])
-        result = await method(arguments["id"], expand=arguments.get("expand"))
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
-
-    elif name == "moysklad_create":
-        entity_type = arguments["entity"]
-        meta = _ENTITY_TYPES[entity_type]
-        method = getattr(client, meta["create_method"])
-        result = await method(arguments["fields"])
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
-
-    elif name == "moysklad_update":
-        entity_type = arguments["entity"]
-        meta = _ENTITY_TYPES[entity_type]
-        method = getattr(client, meta["update_method"])
-        result = await method(arguments["id"], arguments["fields"])
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
-
-    elif name == "moysklad_stock":
-        mode = arguments.get("mode", "all")
-        if mode == "bystore":
-            result = await client.get_stock_by_store(
-                limit=arguments.get("limit"),
-                offset=arguments.get("offset"),
+        if name == "moysklad_list":
+            entity_type = arguments["entity"]
+            meta = _ENTITY_TYPES[entity_type]
+            method = getattr(client, meta["list_method"])
+            return _as_text(
+                await method(
+                    limit=arguments.get("limit"),
+                    offset=arguments.get("offset"),
+                    filter_expr=arguments.get("filter"),
+                    search=arguments.get("search"),
+                    expand=arguments.get("expand"),
+                    **(
+                        {}
+                        if entity_type != "customerorder"
+                        else {"order": arguments.get("order")}
+                    ),
+                )
             )
-        else:
-            result = await client.get_stock_all(
-                limit=arguments.get("limit"),
-                offset=arguments.get("offset"),
-                group_by=arguments.get("groupBy"),
+
+        if name == "moysklad_get":
+            entity_type = arguments["entity"]
+            meta = _ENTITY_TYPES[entity_type]
+            method = getattr(client, meta["get_method"])
+            return _as_text(await method(arguments["id"], expand=arguments.get("expand")))
+
+        if name == "moysklad_create":
+            entity_type = arguments["entity"]
+            meta = _ENTITY_TYPES[entity_type]
+            method = getattr(client, meta["create_method"])
+            return _as_text(await method(arguments["fields"]))
+
+        if name == "moysklad_update":
+            entity_type = arguments["entity"]
+            meta = _ENTITY_TYPES[entity_type]
+            method = getattr(client, meta["update_method"])
+            return _as_text(await method(arguments["id"], arguments["fields"]))
+
+        if name == "moysklad_stock":
+            mode = arguments.get("mode", "all")
+            if mode == "bystore":
+                return _as_text(
+                    await client.get_stock_by_store(
+                        limit=arguments.get("limit"),
+                        offset=arguments.get("offset"),
+                    )
+                )
+            return _as_text(
+                await client.get_stock_all(
+                    limit=arguments.get("limit"),
+                    offset=arguments.get("offset"),
+                    group_by=arguments.get("groupBy"),
+                )
             )
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
 
-    elif name == "moysklad_organizations":
-        result = await client.get_organizations()
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+        if name == "moysklad_organizations":
+            return _as_text(await client.get_organizations())
 
-    return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
+        return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
+
+    except MoyskladError as exc:
+        return [TextContent(type="text", text=f"Ошибка МойСклад: {exc.message}")]
 
 
 async def main() -> None:

@@ -17,7 +17,7 @@ from mcp.types import TextContent, Tool
 from yzel.core.types import Bitrix24Credential
 from yzel.core.vault import CredentialVault
 
-from .client import Bitrix24Client
+from .client import Bitrix24Client, Bitrix24Error
 
 server = Server("yzel-bitrix24")
 
@@ -237,58 +237,64 @@ async def list_tools() -> list[Tool]:
     ]
 
 
+def _as_text(payload: Any) -> list[TextContent]:
+    return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]
+
+
 @server.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     """Handle tool calls."""
-    client = await _ensure_client()
+    try:
+        client = await _ensure_client()
 
-    if name == "bitrix24_crm_list":
-        entity_type = arguments["entity"]
-        meta = _CRM_ENTITIES[entity_type]
-        method = getattr(client, meta["list_method"])
-        result = await method(
-            select=arguments.get("select"),
-            filter_params=arguments.get("filter"),
-            order=arguments.get("order"),
-            start=arguments.get("start", 0),
-        )
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+        if name == "bitrix24_crm_list":
+            entity_type = arguments["entity"]
+            meta = _CRM_ENTITIES[entity_type]
+            method = getattr(client, meta["list_method"])
+            return _as_text(
+                await method(
+                    select=arguments.get("select"),
+                    filter_params=arguments.get("filter"),
+                    order=arguments.get("order"),
+                    start=arguments.get("start", 0),
+                )
+            )
 
-    elif name == "bitrix24_crm_get":
-        entity_type = arguments["entity"]
-        meta = _CRM_ENTITIES[entity_type]
-        method = getattr(client, meta["get_method"])
-        result = await method(arguments["id"])
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+        if name == "bitrix24_crm_get":
+            entity_type = arguments["entity"]
+            meta = _CRM_ENTITIES[entity_type]
+            method = getattr(client, meta["get_method"])
+            return _as_text(await method(arguments["id"]))
 
-    elif name == "bitrix24_crm_create":
-        entity_type = arguments["entity"]
-        meta = _CRM_ENTITIES[entity_type]
-        method = getattr(client, meta["create_method"])
-        result = await method(arguments["fields"])
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+        if name == "bitrix24_crm_create":
+            entity_type = arguments["entity"]
+            meta = _CRM_ENTITIES[entity_type]
+            method = getattr(client, meta["create_method"])
+            return _as_text(await method(arguments["fields"]))
 
-    elif name == "bitrix24_crm_update":
-        entity_type = arguments["entity"]
-        meta = _CRM_ENTITIES[entity_type]
-        method = getattr(client, meta["update_method"])
-        result = await method(arguments["id"], arguments["fields"])
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+        if name == "bitrix24_crm_update":
+            entity_type = arguments["entity"]
+            meta = _CRM_ENTITIES[entity_type]
+            method = getattr(client, meta["update_method"])
+            return _as_text(await method(arguments["id"], arguments["fields"]))
 
-    elif name == "bitrix24_tasks_list":
-        result = await client.get_tasks(
-            select=arguments.get("select"),
-            filter_params=arguments.get("filter"),
-            order=arguments.get("order"),
-            start=arguments.get("start", 0),
-        )
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+        if name == "bitrix24_tasks_list":
+            return _as_text(
+                await client.get_tasks(
+                    select=arguments.get("select"),
+                    filter_params=arguments.get("filter"),
+                    order=arguments.get("order"),
+                    start=arguments.get("start", 0),
+                )
+            )
 
-    elif name == "bitrix24_task_get":
-        result = await client.get_task(arguments["id"])
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+        if name == "bitrix24_task_get":
+            return _as_text(await client.get_task(arguments["id"]))
 
-    return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
+        return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
+
+    except Bitrix24Error as exc:
+        return [TextContent(type="text", text=f"Ошибка Bitrix24: {exc.description}")]
 
 
 async def main() -> None:

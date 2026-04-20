@@ -6,10 +6,16 @@ Base URL: https://api.moysklad.ru/api/remap/1.2/
 Key gotcha: nested entities (e.g., agent inside an order) return as
 UUID references by default. Must pass `expand=agent,organization`
 to inline the full nested objects. Without expand, users get useless IDs.
+
+Rate limit: Moysklad docs specify ≤5 req/sec and ≤45 concurrent per
+account. We throttle conservatively at 5 rps; the caller is responsible
+for keeping concurrency reasonable (not enforced client-side).
 """
 
 from __future__ import annotations
 
+import asyncio
+import time
 from typing import Any
 
 import httpx
@@ -17,13 +23,36 @@ import httpx
 _DEFAULT_BASE_URL = "https://api.moysklad.ru/api/remap/1.2"
 
 
+class RateLimiter:
+    """Leaky-bucket rate limiter, per-client instance."""
+
+    def __init__(self, max_per_second: float) -> None:
+        self._min_interval = 1.0 / max_per_second
+        self._last_request: float = 0.0
+        self._lock = asyncio.Lock()
+
+    async def acquire(self) -> None:
+        async with self._lock:
+            now = time.monotonic()
+            elapsed = now - self._last_request
+            if elapsed < self._min_interval:
+                await asyncio.sleep(self._min_interval - elapsed)
+            self._last_request = time.monotonic()
+
+
 class MoyskladClient:
     """Async client for Moysklad JSON API 1.2."""
 
-    def __init__(self, bearer_token: str, base_url: str = _DEFAULT_BASE_URL) -> None:
+    def __init__(
+        self,
+        bearer_token: str,
+        base_url: str = _DEFAULT_BASE_URL,
+        max_per_second: float = 5.0,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._token = bearer_token
         self._client: httpx.AsyncClient | None = None
+        self._limiter = RateLimiter(max_per_second=max_per_second)
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
@@ -46,31 +75,18 @@ class MoyskladClient:
     ) -> dict[str, Any]:
         """Make an authenticated API request.
 
-        Returns:
-            Parsed JSON response.
-
         Raises:
-            httpx.HTTPStatusError: On non-2xx response.
-            MoyskladError: On API-level error with detail message.
+            MoyskladError: On any non-2xx response. Carries the Moysklad
+                `errors[]` detail when present, else falls back to the HTTP
+                status + reason phrase so callers never see raw httpx errors.
         """
+        await self._limiter.acquire()
         url = f"{self._base_url}/{path.lstrip('/')}"
         client = await self._get_client()
         response = await client.request(method, url, params=params, json=json_data)
 
         if response.status_code >= 400:
-            try:
-                body = response.json()
-                errors = body.get("errors", [])
-                if errors:
-                    err = errors[0]
-                    raise MoyskladError(
-                        code=err.get("code", response.status_code),
-                        message=err.get("error", response.reason_phrase or "Unknown error"),
-                        more_info=err.get("moreInfo", ""),
-                    )
-            except (ValueError, KeyError):
-                pass
-            response.raise_for_status()
+            raise _parse_moysklad_error(response)
 
         return response.json()
 
@@ -227,10 +243,55 @@ class MoyskladClient:
 
 
 class MoyskladError(Exception):
-    """Moysklad API error."""
+    """Moysklad API error.
 
-    def __init__(self, code: int | str, message: str, more_info: str = "") -> None:
+    `code` is the Moysklad-specific numeric error code from `errors[].code`
+    when present (e.g. 1040 for auth). `status_code` is the HTTP status
+    (always populated). `more_info` holds the documentation URL Moysklad
+    ships with each error.
+    """
+
+    def __init__(
+        self,
+        code: int | str,
+        message: str,
+        more_info: str = "",
+        status_code: int = 0,
+    ) -> None:
         self.code = code
         self.message = message
         self.more_info = more_info
-        super().__init__(f"Moysklad error [{code}]: {message}")
+        self.status_code = status_code
+        super().__init__(f"Moysklad error [{status_code}/{code}]: {message}")
+
+
+def _parse_moysklad_error(response: httpx.Response) -> MoyskladError:
+    """Build a MoyskladError from a 4xx/5xx response.
+
+    Works even when Moysklad returns an empty body or a non-JSON payload.
+    """
+    try:
+        body = response.json()
+    except ValueError:
+        return MoyskladError(
+            code=response.status_code,
+            message=response.text[:200] or response.reason_phrase or "HTTP error",
+            status_code=response.status_code,
+        )
+
+    if isinstance(body, dict):
+        errors = body.get("errors") or []
+        if errors:
+            err = errors[0] if isinstance(errors[0], dict) else {}
+            return MoyskladError(
+                code=err.get("code", response.status_code),
+                message=err.get("error") or response.reason_phrase or "Unknown error",
+                more_info=err.get("moreInfo", ""),
+                status_code=response.status_code,
+            )
+
+    return MoyskladError(
+        code=response.status_code,
+        message=response.reason_phrase or "Unknown error",
+        status_code=response.status_code,
+    )
