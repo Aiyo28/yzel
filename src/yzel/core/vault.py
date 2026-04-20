@@ -21,8 +21,10 @@ from yzel.core.types import (
     Bitrix24Credential,
     MoyskladCredential,
     OneCCredential,
+    OzonCredential,
     ServiceCredential,
     ServiceType,
+    WildberriesCredential,
 )
 
 _CREDENTIAL_CLASSES: dict[ServiceType, type[ServiceCredential]] = {
@@ -30,6 +32,8 @@ _CREDENTIAL_CLASSES: dict[ServiceType, type[ServiceCredential]] = {
     ServiceType.BITRIX24: Bitrix24Credential,
     ServiceType.AMOCRM: AmoCRMCredential,
     ServiceType.MOYSKLAD: MoyskladCredential,
+    ServiceType.WILDBERRIES: WildberriesCredential,
+    ServiceType.OZON: OzonCredential,
 }
 
 _DEFAULT_DB_PATH = Path.home() / ".yzel" / "store.db"

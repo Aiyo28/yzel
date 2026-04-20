@@ -3,12 +3,12 @@
 ## Identity (reaffirmed 2026-04-20 — D53)
 Yzel = **not-for-profit OSS** MCP connector portfolio. No sale, no paid tier, no AIYO OS commercial layer. MIT across the board. Publish and help CIS businesses integrate tools easily. Revenue Gate `[—]`.
 
-⚠️ `CLAUDE.md` still mentions BSL enterprise layer — stale, supersede on next CLAUDE.md pass.
+`CLAUDE.md` superseded 2026-04-20 (post-D53). Empty `src/yzel/enterprise/` dir removed. Uncommitted.
 
 ## Continue
-- [ ] Ship 1C:Enterprise connector (Tier 1 #1 — highest CIS pain density)
-- [ ] Ship Wildberries Seller API connector (Tier 1 #2 — SPOT crisis Jul 1 2026)
-- [ ] Ship Ozon Seller API (kz) connector (Tier 1 #3 — 80K+ KZ sellers)
+- [x] Ship 1C:Enterprise connector (Tier 1 #1) — CRUD + count + schema tools, OneCError wrapping, streaming $metadata, 1C:Fresh detection, 14 integration tests 2026-04-20
+- [x] Ship Wildberries Seller API connector (Tier 1 #2) — 5-host client (common/content/marketplace/statistics/prices), per-host rate limits, 10 MCP tools (seller_info/warehouses/new_orders/orders/stocks get+update/sales/order_stats/cards/prices), 12 integration tests 2026-04-20
+- [x] Ship Ozon Seller API connector (Tier 1 #3) — dual-header auth (Client-Id + Api-Key), sandbox URL overridable, 11 MCP tools (warehouses/products list+info/stocks get+update/prices update/FBS unfulfilled+list+get/analytics/transactions), 15 integration tests 2026-04-20
 - [ ] Ship Kaspi Pay / Kaspi Business connector (Tier 1 #4 — 77% KZ e-commerce share)
 - [ ] Finish already-scaffolded Tier 2: Bitrix24 / AmoCRM / Moysklad / Telegram Bot / iiko
 - [ ] Reintroduce WhatsApp via wacli sidecar — reference `github.com/steipete/wacli`
