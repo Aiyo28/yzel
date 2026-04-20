@@ -2,12 +2,15 @@
 
 Parses the OData v3 $metadata XML to discover available entities,
 their fields, and types. Handles Cyrillic entity names.
+
+Uses ElementTree.iterparse for streaming so ERP-scale configs with
+10MB+ metadata don't balloon memory (CLAUDE.md Critical Gotcha #5).
 """
 
 from __future__ import annotations
 
+import io
 import xml.etree.ElementTree as ET
-from typing import Any
 
 import httpx
 
@@ -39,45 +42,47 @@ def _simplify_type(edm_type: str) -> str:
     return _TYPE_MAP.get(edm_type, edm_type)
 
 
+_ENTITY_TYPE_TAG = f"{{{_EDM_NS}}}EntityType"
+_PROPERTY_TAG = f"{{{_EDM_NS}}}Property"
+
+
+def _iter_entity_types(source: io.IOBase | str):
+    """Yield `EntityType` elements from an XML source using iterparse.
+
+    Accepts a string (wrapped in BytesIO) or a file-like object. Elements
+    are cleared after yield so the parser never holds the full tree.
+    """
+    if isinstance(source, str):
+        source = io.BytesIO(source.encode("utf-8"))
+
+    context = ET.iterparse(source, events=("end",))
+    for _, elem in context:
+        if elem.tag == _ENTITY_TYPE_TAG:
+            yield elem
+            elem.clear()
+
+
+def _build_entity(element: ET.Element) -> SchemaEntity:
+    name = element.get("Name", "")
+    fields: list[SchemaField] = []
+    for prop in element.iter(_PROPERTY_TAG):
+        fields.append(
+            SchemaField(
+                name=prop.get("Name", ""),
+                field_type=_simplify_type(prop.get("Type", "Edm.String")),
+                nullable=prop.get("Nullable", "true").lower() == "true",
+            )
+        )
+    return SchemaEntity(service=ServiceType.ONEC, entity_name=name, fields=fields)
+
+
 def parse_metadata_xml(xml_content: str) -> list[SchemaEntity]:
     """Parse OData $metadata XML into SchemaEntity list.
 
     Handles Cyrillic entity names (e.g., Справочник_Контрагенты).
-    Streams parsing for large metadata documents.
+    Streams via iterparse so 10MB+ ERP metadata doesn't load into memory.
     """
-    root = ET.fromstring(xml_content)
-
-    entities: list[SchemaEntity] = []
-
-    # Find all EntityType definitions
-    for schema in root.iter(f"{{{_EDMX_NS}}}DataServices"):
-        for ns_schema in schema.iter(f"{{{_EDM_NS}}}Schema"):
-            for entity_type in ns_schema.iter(f"{{{_EDM_NS}}}EntityType"):
-                name = entity_type.get("Name", "")
-                fields: list[SchemaField] = []
-
-                for prop in entity_type.iter(f"{{{_EDM_NS}}}Property"):
-                    prop_name = prop.get("Name", "")
-                    prop_type = prop.get("Type", "Edm.String")
-                    nullable = prop.get("Nullable", "true").lower() == "true"
-
-                    fields.append(
-                        SchemaField(
-                            name=prop_name,
-                            field_type=_simplify_type(prop_type),
-                            nullable=nullable,
-                        )
-                    )
-
-                entities.append(
-                    SchemaEntity(
-                        service=ServiceType.ONEC,
-                        entity_name=name,
-                        fields=fields,
-                    )
-                )
-
-    return entities
+    return [_build_entity(elem) for elem in _iter_entity_types(xml_content)]
 
 
 async def discover_schema(

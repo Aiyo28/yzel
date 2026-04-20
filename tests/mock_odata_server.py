@@ -291,26 +291,33 @@ async def entity_list(request: Request) -> Response:
 
     data = list(ENTITIES[entity_name])
 
-    # $top
+    # $filter (basic support) — applied before $top so $inlinecount reflects the filtered set
+    filter_expr = request.query_params.get("$filter")
+    if filter_expr:
+        data = _apply_filter(data, filter_expr)
+
+    # $inlinecount=allpages returns the pre-pagination total alongside the page
+    inlinecount = request.query_params.get("$inlinecount") == "allpages"
+    total = len(data)
+
+    # $top (must be applied after the count is captured)
     top = request.query_params.get("$top")
-    if top:
+    if top is not None:
         data = data[: int(top)]
 
-    # $select
+    # $select (after filtering + pagination)
     select = request.query_params.get("$select")
     if select:
         fields = [f.strip() for f in select.split(",")]
         data = [{k: v for k, v in item.items() if k in fields} for item in data]
 
-    # $filter (basic support)
-    filter_expr = request.query_params.get("$filter")
-    if filter_expr:
-        data = _apply_filter(data, filter_expr)
-
-    return JSONResponse({
+    payload: dict = {
         "odata.metadata": f"{request.url.scheme}://{request.url.netloc}/odata/standard.odata/$metadata##{entity_name}",
         "value": data,
-    })
+    }
+    if inlinecount:
+        payload["odata.count"] = str(total)
+    return JSONResponse(payload)
 
 
 async def entity_single(request: Request) -> Response:

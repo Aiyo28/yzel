@@ -2,14 +2,15 @@
 
 ## Context
 
-Unified MCP connectors bridging 1C, Bitrix24, AmoCRM, and Moysklad to AI assistants — the Plaid of Russian business tools.
+Not-for-profit OSS MCP connector portfolio for CIS business tools (1C, Bitrix24, AmoCRM, Moysklad, Wildberries, Ozon KZ, Kaspi, Telegram, iiko, goszakup, WhatsApp-via-wacli, meetings platforms). MIT end-to-end. No paid tier, no closed cloud layer. Publish-and-help positioning. Revenue Gate `[—]`.
+
+Reaffirmed 2026-04-20 (D53). Supersedes prior MIT-connectors + BSL-enterprise + AIYO-OS-commercial-layer framing (D2, D10, D13, D17 all effectively retired for Yzel's scope).
 
 | Component | Stack | Constraints |
 |-----------|-------|-------------|
 | MCP Servers | Python 3.11+, mcp SDK, uv | Must run on Windows without WSL |
-| Connectors | OData v3 (1C), REST (Bitrix/Amo/MS) | MIT license — no enterprise features in this layer |
-| Enterprise | BSL license | SSO, audit, cross-system queries — separate src/yzel/enterprise/ |
-| Dashboard (Phase 2+) | TypeScript / Next.js | Not started yet |
+| Connectors | OData v3 (1C), REST (most), Playwright/scrape (goszakup if no token) | MIT license everywhere |
+| Sidecars | WhatsApp via `wacli` subprocess per tenant | Reference: github.com/steipete/wacli |
 
 ## Session Protocol
 
@@ -34,11 +35,12 @@ Unified MCP connectors bridging 1C, Bitrix24, AmoCRM, and Moysklad to AI assista
 
 ## Rules
 
+- **MIT everywhere.** Every file under `src/` is MIT. No BSL, no trade-secret carve-outs, no closed server engine. If a feature needs a closed component, it doesn't belong in Yzel.
+- **Not-for-profit framing.** README, docs, CLI help, issue templates: good-faith OSS language. No pricing, no sales funnel, no lighthouse pitches. EN + RU.
 - **Never require changes to client's 1C configuration.** Connect via published OData/HTTP APIs only. No BSL extensions, no config modifications.
 - **Cyrillic field names stay Cyrillic.** 1C OData returns Cyrillic object names (`Справочник_Номенклатура`). Do not transliterate — preserve as-is in code and API responses.
 - **Always request `?$format=json` for 1C.** OData defaults to XML. Every 1C request must include the format parameter.
 - **RU-first docs.** README, CLI help, error messages: Russian primary, English secondary.
-- **License boundary is directory-based.** `src/yzel/connectors/` = MIT. `src/yzel/enterprise/` = BSL. Never leak enterprise code into connector modules.
 - **Dynamic schema, never hardcode.** 1C installations have different configs. Always discover available objects via `$metadata` at runtime.
 
 ## Critical Gotchas
