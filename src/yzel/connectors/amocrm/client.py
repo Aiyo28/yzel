@@ -16,6 +16,7 @@ from typing import Any, Callable
 import httpx
 
 _REFRESH_MARGIN_SECONDS = 300  # Refresh 5 min before expiry
+REFRESH_INACTIVITY_LIMIT_DAYS = 90  # AmoCRM silent-death threshold
 
 
 class AmoCRMClient:
@@ -31,6 +32,7 @@ class AmoCRMClient:
         client_secret: str,
         redirect_uri: str,
         on_token_refresh: Callable[[str, str, float], None] | None = None,
+        refresh_token_updated_at: float | None = None,
     ) -> None:
         self._subdomain = subdomain
         self._access_token = access_token
@@ -40,6 +42,10 @@ class AmoCRMClient:
         self._client_secret = client_secret
         self._redirect_uri = redirect_uri
         self._on_token_refresh = on_token_refresh
+        # None → assume "now" so fresh-install credentials don't trip the guard
+        self._refresh_token_updated_at: float = (
+            refresh_token_updated_at if refresh_token_updated_at else time.time()
+        )
         self._client: httpx.AsyncClient | None = None
         self._base_url = f"https://{subdomain}.amocrm.ru"
 
@@ -87,6 +93,7 @@ class AmoCRMClient:
         self._access_token = data["access_token"]
         self._refresh_token = data["refresh_token"]
         self._expires_at = time.time() + data["expires_in"]
+        self._refresh_token_updated_at = time.time()
 
         if self._on_token_refresh:
             self._on_token_refresh(self._access_token, self._refresh_token, self._expires_at)
@@ -94,6 +101,40 @@ class AmoCRMClient:
     async def _ensure_auth(self) -> None:
         if self._token_needs_refresh():
             await self._refresh_tokens()
+
+    # --- Refresh-health guard (3-month silent-death prevention) ---
+
+    @property
+    def refresh_token_updated_at(self) -> float:
+        """Unix timestamp of the last successful refresh_token exchange."""
+        return self._refresh_token_updated_at
+
+    def days_since_refresh(self) -> float:
+        """How long since the refresh_token was last exchanged."""
+        return (time.time() - self._refresh_token_updated_at) / 86400.0
+
+    def days_until_refresh_expiry(
+        self, inactivity_limit_days: int = REFRESH_INACTIVITY_LIMIT_DAYS
+    ) -> float:
+        """Days remaining before silent-death at the given inactivity limit.
+
+        AmoCRM does not publish the exact limit; 90 days is the figure in
+        their docs as of 2026. Pass a lower value to get an earlier warning.
+        """
+        return inactivity_limit_days - self.days_since_refresh()
+
+    async def ensure_refresh_fresh(self, min_remaining_days: float = 14.0) -> bool:
+        """Force a token refresh if the refresh_token is approaching staleness.
+
+        Call this from a scheduled health check (e.g. daily cron). If fewer
+        than `min_remaining_days` remain before the inactivity limit, the
+        client performs a refresh — which resets the clock on both tokens —
+        and returns True. Returns False if no refresh was needed.
+        """
+        if self.days_until_refresh_expiry() <= min_remaining_days:
+            await self._refresh_tokens()
+            return True
+        return False
 
     async def _request(
         self,

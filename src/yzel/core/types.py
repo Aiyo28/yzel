@@ -55,7 +55,13 @@ class Bitrix24Credential(ServiceCredential):
 
 
 class AmoCRMCredential(ServiceCredential):
-    """AmoCRM/Kommo credentials — OAuth2 with refresh."""
+    """AmoCRM/Kommo credentials — OAuth2 with refresh.
+
+    AmoCRM refresh tokens die after ~3 months of *inactivity* (no refresh call
+    made in that window). `refresh_token_updated_at` tracks the last time the
+    refresh_token was successfully exchanged so callers can monitor staleness
+    and force a keep-alive refresh before the silent-death threshold.
+    """
 
     service: ServiceType = ServiceType.AMOCRM
     subdomain: str = Field(description="AmoCRM subdomain (e.g., mycompany)")
@@ -65,6 +71,10 @@ class AmoCRMCredential(ServiceCredential):
     client_id: str
     client_secret: str
     redirect_uri: str
+    refresh_token_updated_at: float = Field(
+        default=0.0,
+        description="Unix timestamp of the last successful refresh_token exchange. 0 = unknown (treat as 'now' for staleness checks).",
+    )
 
 
 class MoyskladCredential(ServiceCredential):

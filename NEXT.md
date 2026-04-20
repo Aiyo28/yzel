@@ -12,10 +12,10 @@ Yzel = **not-for-profit OSS** MCP connector portfolio. No sale, no paid tier, no
 
 ## Tier 2 — Already-scaffolded + adjacent (next)
 - [ ] Finish Bitrix24 — scaffolded, audit + close gaps (rate-limit cases, pagination helpers, webhook refresh guard)
-- [ ] Finish AmoCRM — scaffolded, audit + close gaps (OAuth refresh health, 3-month silent-death detector)
+- [x] Finish AmoCRM — 3-month silent-death guard shipped: `refresh_token_updated_at` tracked, `days_since_refresh()` / `days_until_refresh_expiry()` / `ensure_refresh_fresh(min_remaining_days)` methods, 5 new tests 2026-04-20
 - [ ] Finish Moysklad — scaffolded, audit + close gaps (expand handling, entity relationships)
-- [x] Telegram Bot API — 12 MCP tools (getMe, send text/photo/document, edit, delete, answer_callback, getUpdates, set/delete/info webhook, getChat), TelegramError with retry_after, 13 tests 2026-04-20
-- [ ] iiko (F&B POS) — new build, 35K venues, chronic 1C-sync pain
+- [x] Telegram Bot API — 12 MCP tools, TelegramError with retry_after, 13 tests 2026-04-20
+- [x] iiko (F&B POS) — apiLogin→1h Bearer, auto-refresh on 401, 9 MCP tools (organizations, terminal_groups, nomenclature, stop_list, deliveries by phone, create_delivery, order/payment types, employees), 15 tests 2026-04-20
 - [ ] Reintroduce WhatsApp via wacli sidecar — reference `github.com/steipete/wacli`
 - [ ] goszakup.gov.kz (B2G niche) — read-only via GUI scrape or API token
 

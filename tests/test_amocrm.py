@@ -241,3 +241,109 @@ async def test_not_found_entity(client: AmoCRMClient) -> None:
     """Getting non-existent entity returns error."""
     with pytest.raises(AmoCRMError, match="не найден"):
         await client.get_lead(99999)
+
+
+# --- Refresh-health guard (3-month silent-death) ---
+
+
+async def test_days_since_refresh_defaults_to_zero_for_fresh_client(mock_server: str) -> None:
+    """A client instantiated without an explicit timestamp is treated as just-refreshed."""
+    c = AmoCRMClient(
+        subdomain="test",
+        access_token=_TEST_ACCESS,
+        refresh_token=_TEST_REFRESH,
+        expires_at=time.time() + 1200,
+        client_id=VALID_CLIENT_ID,
+        client_secret=VALID_CLIENT_SECRET,
+        redirect_uri=VALID_REDIRECT_URI,
+    )
+    try:
+        assert c.days_since_refresh() < 1.0
+        assert c.days_until_refresh_expiry() > 80.0
+    finally:
+        await c.close()
+
+
+async def test_days_until_refresh_expiry_reflects_stored_timestamp(mock_server: str) -> None:
+    """An older refresh_token_updated_at produces a smaller remaining-window."""
+    forty_days_ago = time.time() - 40 * 86400
+    c = AmoCRMClient(
+        subdomain="test",
+        access_token=_TEST_ACCESS,
+        refresh_token=_TEST_REFRESH,
+        expires_at=time.time() + 1200,
+        client_id=VALID_CLIENT_ID,
+        client_secret=VALID_CLIENT_SECRET,
+        redirect_uri=VALID_REDIRECT_URI,
+        refresh_token_updated_at=forty_days_ago,
+    )
+    try:
+        assert 39.0 < c.days_since_refresh() < 41.0
+        assert 48.0 < c.days_until_refresh_expiry() < 52.0
+    finally:
+        await c.close()
+
+
+async def test_ensure_refresh_fresh_no_op_when_recent(mock_server: str) -> None:
+    """Recent refresh → ensure_refresh_fresh skips the network call."""
+    c = AmoCRMClient(
+        subdomain="test",
+        access_token=_TEST_ACCESS,
+        refresh_token=_TEST_REFRESH,
+        expires_at=time.time() + 1200,
+        client_id=VALID_CLIENT_ID,
+        client_secret=VALID_CLIENT_SECRET,
+        redirect_uri=VALID_REDIRECT_URI,
+    )
+    c.base_url = mock_server
+    try:
+        refreshed = await c.ensure_refresh_fresh(min_remaining_days=14.0)
+        assert refreshed is False
+    finally:
+        await c.close()
+
+
+async def test_ensure_refresh_fresh_forces_refresh_when_stale(mock_server: str) -> None:
+    """Stale refresh → ensure_refresh_fresh triggers a refresh and updates the timestamp."""
+    eighty_days_ago = time.time() - 80 * 86400
+    c = AmoCRMClient(
+        subdomain="test",
+        access_token=_TEST_ACCESS,
+        refresh_token=_TEST_REFRESH,
+        expires_at=time.time() + 1200,  # Access token still valid
+        client_id=VALID_CLIENT_ID,
+        client_secret=VALID_CLIENT_SECRET,
+        redirect_uri=VALID_REDIRECT_URI,
+        refresh_token_updated_at=eighty_days_ago,
+    )
+    c.base_url = mock_server
+    try:
+        assert c.days_until_refresh_expiry() < 14.0
+        refreshed = await c.ensure_refresh_fresh(min_remaining_days=14.0)
+        assert refreshed is True
+        # Timestamp reset to "now" — plenty of runway again
+        assert c.days_since_refresh() < 1.0
+        assert c.days_until_refresh_expiry() > 80.0
+    finally:
+        await c.close()
+
+
+async def test_refresh_updates_timestamp_on_normal_auto_refresh(mock_server: str) -> None:
+    """The auto-refresh path (expired access token) also bumps refresh_token_updated_at."""
+    old_ts = time.time() - 60 * 86400
+    c = AmoCRMClient(
+        subdomain="test",
+        access_token=_TEST_ACCESS,
+        refresh_token=_TEST_REFRESH,
+        expires_at=time.time() - 10,  # Forces refresh on next call
+        client_id=VALID_CLIENT_ID,
+        client_secret=VALID_CLIENT_SECRET,
+        redirect_uri=VALID_REDIRECT_URI,
+        refresh_token_updated_at=old_ts,
+    )
+    c.base_url = mock_server
+    try:
+        await c.get_account()
+        assert c.days_since_refresh() < 1.0
+    finally:
+        await c.close()
