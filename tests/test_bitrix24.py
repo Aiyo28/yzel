@@ -192,6 +192,15 @@ async def test_not_found_entity(client: Bitrix24Client) -> None:
         await client.get_lead(99999)
 
 
+async def test_bitrix24_error_carries_status_code(client: Bitrix24Client) -> None:
+    """Bitrix24Error records the HTTP status — even for Bitrix's 200-with-error envelope."""
+    with pytest.raises(Bitrix24Error) as exc:
+        await client._call("crm.nonexistent.method")
+    # Mock returns 200 + error body for invalid method (matches real Bitrix24)
+    assert exc.value.status_code == 200
+    assert exc.value.code == "ERROR_METHOD_NOT_FOUND"
+
+
 # --- Rate Limiter Tests ---
 
 
