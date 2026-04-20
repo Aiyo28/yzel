@@ -18,6 +18,7 @@ class ServiceType(str, Enum):
     WILDBERRIES = "wildberries"
     OZON = "ozon"
     TELEGRAM = "telegram"
+    IIKO = "iiko"
 
 
 class ConnectionStatus(str, Enum):
@@ -91,6 +92,26 @@ class OzonCredential(ServiceCredential):
     base_url: str = Field(
         default="https://api-seller.ozon.ru",
         description="API host override (use https://api-seller-sandbox.ozon.ru for sandbox)",
+    )
+
+
+class IikoCredential(ServiceCredential):
+    """iiko Cloud API credentials — apiLogin (exchanged for a 1h Bearer token).
+
+    The `apiLogin` is the long-lived secret issued in the iikoWeb back office
+    (Настройки → API). Every access token minted from it expires in 1 hour;
+    the client refreshes on demand, so only the apiLogin must be stored.
+
+    base_url differs by region — Russia uses `api-ru.iiko.services`; other
+    regions ship their own hostnames. Default points at RU since the MVP
+    audience is CIS.
+    """
+
+    service: ServiceType = ServiceType.IIKO
+    api_login: str = Field(description="apiLogin issued in iikoWeb back office")
+    base_url: str = Field(
+        default="https://api-ru.iiko.services",
+        description="iiko Cloud API host (region-specific)",
     )
 
 
