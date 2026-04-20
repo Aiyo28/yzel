@@ -24,6 +24,7 @@ from yzel.core.types import (
     OzonCredential,
     ServiceCredential,
     ServiceType,
+    TelegramCredential,
     WildberriesCredential,
 )
 
@@ -34,6 +35,7 @@ _CREDENTIAL_CLASSES: dict[ServiceType, type[ServiceCredential]] = {
     ServiceType.MOYSKLAD: MoyskladCredential,
     ServiceType.WILDBERRIES: WildberriesCredential,
     ServiceType.OZON: OzonCredential,
+    ServiceType.TELEGRAM: TelegramCredential,
 }
 
 _DEFAULT_DB_PATH = Path.home() / ".yzel" / "store.db"

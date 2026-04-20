@@ -64,6 +64,7 @@ uv run python -m yzel.connectors.onec.server
 uv run python -m yzel.connectors.bitrix24.server
 uv run python -m yzel.connectors.wildberries.server
 uv run python -m yzel.connectors.ozon.server
+uv run python -m yzel.connectors.telegram.server
 
 # Test
 uv run pytest

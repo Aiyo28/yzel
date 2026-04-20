@@ -17,6 +17,7 @@ class ServiceType(str, Enum):
     MOYSKLAD = "moysklad"
     WILDBERRIES = "wildberries"
     OZON = "ozon"
+    TELEGRAM = "telegram"
 
 
 class ConnectionStatus(str, Enum):
@@ -90,6 +91,22 @@ class OzonCredential(ServiceCredential):
     base_url: str = Field(
         default="https://api-seller.ozon.ru",
         description="API host override (use https://api-seller-sandbox.ozon.ru for sandbox)",
+    )
+
+
+class TelegramCredential(ServiceCredential):
+    """Telegram Bot API credentials — single bot token.
+
+    Tokens are issued by @BotFather and carry the bot's identity; they live
+    in the URL path (`https://api.telegram.org/bot<token>/<method>`) rather
+    than a header, which means accidental logging of the URL leaks the token.
+    """
+
+    service: ServiceType = ServiceType.TELEGRAM
+    bot_token: str = Field(description="Token from @BotFather (format: 123456:ABC-...)")
+    base_url: str = Field(
+        default="https://api.telegram.org",
+        description="Override for self-hosted Telegram Bot API (local-mode deployments)",
     )
 
 
