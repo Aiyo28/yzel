@@ -19,6 +19,7 @@ from cryptography.fernet import Fernet
 from yzel.core.types import (
     AmoCRMCredential,
     Bitrix24Credential,
+    IikoCredential,
     MoyskladCredential,
     OneCCredential,
     OzonCredential,
@@ -36,6 +37,7 @@ _CREDENTIAL_CLASSES: dict[ServiceType, type[ServiceCredential]] = {
     ServiceType.WILDBERRIES: WildberriesCredential,
     ServiceType.OZON: OzonCredential,
     ServiceType.TELEGRAM: TelegramCredential,
+    ServiceType.IIKO: IikoCredential,
 }
 
 _DEFAULT_DB_PATH = Path.home() / ".yzel" / "store.db"
