@@ -15,6 +15,8 @@ class ServiceType(str, Enum):
     BITRIX24 = "bitrix24"
     AMOCRM = "amocrm"
     MOYSKLAD = "moysklad"
+    WILDBERRIES = "wildberries"
+    OZON = "ozon"
 
 
 class ConnectionStatus(str, Enum):
@@ -68,6 +70,41 @@ class MoyskladCredential(ServiceCredential):
 
     service: ServiceType = ServiceType.MOYSKLAD
     bearer_token: str
+
+
+class OzonCredential(ServiceCredential):
+    """Ozon Seller API credentials — Client-Id + Api-Key dual header.
+
+    Both headers are required on every request (Ozon returns 403 if either
+    is missing or mismatched). Client-Id is the seller's numeric ID from the
+    Ozon seller cabinet; api_key is the token issued alongside it.
+
+    KZ-domiciled sellers obtain credentials via the seller.ozon.kz cabinet.
+    The base_url defaults to the shared production host and can be pointed
+    at Ozon's sandbox for integration testing.
+    """
+
+    service: ServiceType = ServiceType.OZON
+    client_id: str = Field(description="Numeric seller ID from Ozon cabinet")
+    api_key: str = Field(description="API key issued for this Client-Id")
+    base_url: str = Field(
+        default="https://api-seller.ozon.ru",
+        description="API host override (use https://api-seller-sandbox.ozon.ru for sandbox)",
+    )
+
+
+class WildberriesCredential(ServiceCredential):
+    """Wildberries Seller API credentials — single JWT api_key from seller cabinet.
+
+    Same token is reused across WB's split hosts (content-api, marketplace-api,
+    statistics-api, prices-api, common-api). Token is scoped per category at
+    creation time in the seller cabinet — the client never sees scopes, so a
+    wrong-scope token surfaces as 401 on call rather than rejection on init.
+    """
+
+    service: ServiceType = ServiceType.WILDBERRIES
+    api_key: str = Field(description="JWT token issued in WB seller cabinet (Настройки → Доступ к API)")
+    is_sandbox: bool = Field(default=False, description="True if token targets WB sandbox hosts")
 
 
 class EntityRecord(BaseModel):
