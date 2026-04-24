@@ -78,6 +78,121 @@ def add_moysklad(name: str, token: str) -> None:
     click.echo(f"✓ Подключение '{name}' сохранено (ID: {connection_id})")
 
 
+@config.command("add-amocrm")
+@click.option("--name", prompt="Имя подключения", help="Connection name")
+@click.option("--subdomain", prompt="Поддомен AmoCRM (mycompany)", help="AmoCRM subdomain")
+@click.option("--client-id", prompt="Client ID", help="OAuth2 client ID")
+@click.option("--client-secret", prompt="Client Secret", hide_input=True, help="OAuth2 client secret")
+@click.option("--redirect-uri", prompt="Redirect URI", help="OAuth2 redirect URI")
+@click.option("--access-token", prompt="Access Token", hide_input=True, help="OAuth2 access token")
+@click.option("--refresh-token", prompt="Refresh Token", hide_input=True, help="OAuth2 refresh token")
+@click.option("--expires-at", prompt="Expires at (unix timestamp)", type=float, help="Access token expiry")
+def add_amocrm(
+    name: str,
+    subdomain: str,
+    client_id: str,
+    client_secret: str,
+    redirect_uri: str,
+    access_token: str,
+    refresh_token: str,
+    expires_at: float,
+) -> None:
+    """Добавить подключение к AmoCRM / Add AmoCRM connection."""
+    import time
+    import uuid
+
+    from yzel.core.types import AmoCRMCredential
+    from yzel.core.vault import CredentialVault
+
+    vault = CredentialVault()
+    cred = AmoCRMCredential(
+        name=name,
+        subdomain=subdomain,
+        client_id=client_id,
+        client_secret=client_secret,
+        redirect_uri=redirect_uri,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_at=expires_at,
+        refresh_token_updated_at=time.time(),
+    )
+    connection_id = str(uuid.uuid4())[:8]
+    vault.store(connection_id, cred)
+    click.echo(f"✓ Подключение '{name}' сохранено (ID: {connection_id})")
+
+
+@config.command("add-wildberries")
+@click.option("--name", prompt="Имя подключения", help="Connection name")
+@click.option("--api-key", prompt="API Key (JWT)", hide_input=True, help="WB seller cabinet JWT token")
+@click.option("--sandbox", is_flag=True, default=False, help="Use WB sandbox hosts")
+def add_wildberries(name: str, api_key: str, sandbox: bool) -> None:
+    """Добавить подключение к Wildberries / Add Wildberries connection."""
+    import uuid
+
+    from yzel.core.types import WildberriesCredential
+    from yzel.core.vault import CredentialVault
+
+    vault = CredentialVault()
+    cred = WildberriesCredential(name=name, api_key=api_key, is_sandbox=sandbox)
+    connection_id = str(uuid.uuid4())[:8]
+    vault.store(connection_id, cred)
+    click.echo(f"✓ Подключение '{name}' сохранено (ID: {connection_id})")
+
+
+@config.command("add-ozon")
+@click.option("--name", prompt="Имя подключения", help="Connection name")
+@click.option("--client-id", prompt="Client ID (seller ID)", help="Numeric seller ID")
+@click.option("--api-key", prompt="API Key", hide_input=True, help="Ozon API key")
+@click.option("--sandbox", is_flag=True, default=False, help="Use Ozon sandbox host")
+def add_ozon(name: str, client_id: str, api_key: str, sandbox: bool) -> None:
+    """Добавить подключение к Ozon / Add Ozon connection."""
+    import uuid
+
+    from yzel.core.types import OzonCredential
+    from yzel.core.vault import CredentialVault
+
+    vault = CredentialVault()
+    base_url = "https://api-seller-sandbox.ozon.ru" if sandbox else "https://api-seller.ozon.ru"
+    cred = OzonCredential(name=name, client_id=client_id, api_key=api_key, base_url=base_url)
+    connection_id = str(uuid.uuid4())[:8]
+    vault.store(connection_id, cred)
+    click.echo(f"✓ Подключение '{name}' сохранено (ID: {connection_id})")
+
+
+@config.command("add-telegram")
+@click.option("--name", prompt="Имя подключения", help="Connection name")
+@click.option("--bot-token", prompt="Bot Token (@BotFather)", hide_input=True, help="Token from @BotFather")
+def add_telegram(name: str, bot_token: str) -> None:
+    """Добавить подключение к Telegram Bot / Add Telegram bot connection."""
+    import uuid
+
+    from yzel.core.types import TelegramCredential
+    from yzel.core.vault import CredentialVault
+
+    vault = CredentialVault()
+    cred = TelegramCredential(name=name, bot_token=bot_token)
+    connection_id = str(uuid.uuid4())[:8]
+    vault.store(connection_id, cred)
+    click.echo(f"✓ Подключение '{name}' сохранено (ID: {connection_id})")
+
+
+@config.command("add-iiko")
+@click.option("--name", prompt="Имя подключения", help="Connection name")
+@click.option("--api-login", prompt="apiLogin", hide_input=True, help="apiLogin from iikoWeb (Настройки → API)")
+def add_iiko(name: str, api_login: str) -> None:
+    """Добавить подключение к iiko / Add iiko Cloud connection."""
+    import uuid
+
+    from yzel.core.types import IikoCredential
+    from yzel.core.vault import CredentialVault
+
+    vault = CredentialVault()
+    cred = IikoCredential(name=name, api_login=api_login)
+    connection_id = str(uuid.uuid4())[:8]
+    vault.store(connection_id, cred)
+    click.echo(f"✓ Подключение '{name}' сохранено (ID: {connection_id})")
+
+
 @config.command("list")
 def list_connections() -> None:
     """Показать все подключения / List all connections."""

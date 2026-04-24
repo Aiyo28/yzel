@@ -2,9 +2,7 @@
 
 ## Context
 
-Not-for-profit OSS MCP connector portfolio for CIS business tools (1C, Bitrix24, AmoCRM, Moysklad, Wildberries, Ozon KZ, Kaspi, Telegram, iiko, goszakup, WhatsApp-via-wacli, meetings platforms). MIT end-to-end. No paid tier, no closed cloud layer. Publish-and-help positioning. Revenue Gate `[—]`.
-
-Reaffirmed 2026-04-20 (D53). Supersedes prior MIT-connectors + BSL-enterprise + AIYO-OS-commercial-layer framing (D2, D10, D13, D17 all effectively retired for Yzel's scope).
+Not-for-profit OSS MCP connector portfolio for CIS business tools (1C, Bitrix24, AmoCRM, Moysklad, Wildberries, Ozon, Telegram, iiko — plus WhatsApp-via-wacli, goszakup, meetings platforms on the roadmap). MIT end-to-end. No paid tier, no closed cloud layer. Publish-and-help positioning.
 
 | Component | Stack | Constraints |
 |-----------|-------|-------------|
@@ -14,29 +12,23 @@ Reaffirmed 2026-04-20 (D53). Supersedes prior MIT-connectors + BSL-enterprise + 
 
 ## Session Protocol
 
-1. **Start:** Read `NEXT.md` + `docs/_context/BRIEF.md`
-2. **Check:** Read `TODO.md` for current phase tasks
-3. **Deep dive:** Vault `Projects/yzel/_context.md` for strategic context
-4. **End:** Update `NEXT.md` with continuity notes
+1. **Start:** Read `ROADMAP.md` for shipped scope + active workstreams
+2. **Architecture:** `docs/ARCHITECTURE.md`
+3. **End:** Update `ROADMAP.md` if you change scope
 
 ## Where to Find Things
 
 | Topic | Location |
 |-------|----------|
 | Architecture | `docs/ARCHITECTURE.md` |
-| Planning | `MASTERPLAN.md`, `TODO.md`, `ROADMAP.md` |
-| Session log | Vault: `Projects/yzel/sessions/` |
-| Strategy + research | Vault: `Projects/yzel/` |
-| 1C API reference | Vault: `Knowledge/AI & Tech - Integration - 1C Enterprise API and Cloud Architecture.md` |
-| Auth patterns | Vault: `Knowledge/AI & Tech - Integration - Unified Auth for CIS Business Tools.md` |
-| Competitive landscape | Vault: `Knowledge/Business - Market Research - CIS Business Tool MCP Ecosystem 2026.md` |
-
-> Vault = `~/Documents/Developer/knowledge-os/`
+| Public roadmap | `ROADMAP.md` |
+| User-facing docs | `README.md` |
+| Per-connector design notes | `docs/ARCHITECTURE.md` → "Per-connector design notes" section |
 
 ## Rules
 
-- **MIT everywhere.** Every file under `src/` is MIT. No BSL, no trade-secret carve-outs, no closed server engine. If a feature needs a closed component, it doesn't belong in Yzel.
-- **Not-for-profit framing.** README, docs, CLI help, issue templates: good-faith OSS language. No pricing, no sales funnel, no lighthouse pitches. EN + RU.
+- **MIT everywhere.** Every file under `src/` is MIT. No closed server engine. If a feature needs a closed component, it doesn't belong in Yzel.
+- **Not-for-profit framing.** README, docs, CLI help, issue templates: good-faith OSS language. No pricing, no sales funnel. EN + RU.
 - **Never require changes to client's 1C configuration.** Connect via published OData/HTTP APIs only. No BSL extensions, no config modifications.
 - **Cyrillic field names stay Cyrillic.** 1C OData returns Cyrillic object names (`Справочник_Номенклатура`). Do not transliterate — preserve as-is in code and API responses.
 - **Always request `?$format=json` for 1C.** OData defaults to XML. Every 1C request must include the format parameter.
@@ -51,7 +43,7 @@ Reaffirmed 2026-04-20 (D53). Supersedes prior MIT-connectors + BSL-enterprise + 
 4. **Bitrix24 rate limit is 2 req/sec (leaky bucket).** Exceeding returns 429 with no retry-after header. Implement client-side rate limiting, don't rely on server response.
 5. **1C `$metadata` can be enormous** (10MB+ for complex ERP configs). Parse streaming, never load full XML into memory. Cache discovered schema with TTL.
 6. **Moysklad nested entities require explicit `expand` parameter.** Without it, you get UUIDs instead of objects. Always expand in list queries or users get useless IDs.
-7. **1C:Fresh OData endpoint format differs from on-prem:** `1cfresh.com/a/sbm/<id>/odata/` vs `<host>/<base>/odata/`. The connector must detect deployment type.
+7. **1C:Fresh OData endpoint format differs from on-prem:** `1cfresh.com/a/<config>/<id>/odata/` vs `<host>/<base>/odata/`. The connector must detect deployment type.
 
 ## Build & Run
 
@@ -69,7 +61,7 @@ uv run python -m yzel.connectors.iiko.server
 
 # Test
 uv run pytest
-uv run pytest tests/test_odata.py -k "test_schema_discovery"
+uv run pytest tests/test_onec.py -k "test_schema_discovery"
 
 # Build package
 uv build
