@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from yzel.core.discovery import parse_metadata_xml
+import pytest
+
+from yzel.core.discovery import EmptySchemaError, discover_schema, parse_metadata_xml
 from yzel.core.types import ServiceType
 
 SAMPLE_METADATA = """<?xml version="1.0" encoding="utf-8"?>
@@ -70,7 +72,7 @@ def test_parse_metadata_service_type() -> None:
 
 
 def test_parse_empty_metadata() -> None:
-    """Empty $metadata returns empty list."""
+    """Empty $metadata returns empty list at parser level."""
     xml = """<?xml version="1.0"?>
     <edmx:Edmx Version="1.0" xmlns:edmx="http://schemas.microsoft.com/ado/2007/06/edmx">
       <edmx:DataServices xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
@@ -80,3 +82,43 @@ def test_parse_empty_metadata() -> None:
     </edmx:Edmx>"""
     entities = parse_metadata_xml(xml)
     assert entities == []
+
+
+_EMPTY_METADATA = """<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="1.0" xmlns:edmx="http://schemas.microsoft.com/ado/2007/06/edmx">
+  <edmx:DataServices xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
+    <Schema Namespace="StandardODATA" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
+      <ComplexType Name="NumberQualifiers"/>
+    </Schema>
+  </edmx:DataServices>
+</edmx:Edmx>"""
+
+
+@pytest.mark.asyncio
+async def test_discover_schema_raises_on_zero_entities(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """discover_schema surfaces unpublished-OData scenarios as EmptySchemaError
+    instead of silently returning []. Mirrors the 1C:Fresh trial case where
+    $metadata contains only system ComplexTypes.
+    """
+    import httpx
+
+    transport = httpx.MockTransport(
+        lambda req: httpx.Response(
+            200,
+            content=_EMPTY_METADATA.encode(),
+            headers={"content-type": "application/xml;charset=utf-8"},
+        )
+    )
+
+    real_async_client = httpx.AsyncClient
+
+    def fake_async_client(*args: object, **kwargs: object) -> httpx.AsyncClient:
+        kwargs["transport"] = transport
+        return real_async_client(*args, **kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", fake_async_client)
+
+    with pytest.raises(EmptySchemaError, match="нулём EntityType"):
+        await discover_schema("https://example.invalid/odata/standard.odata", "u", "p")

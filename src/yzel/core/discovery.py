@@ -85,6 +85,17 @@ def parse_metadata_xml(xml_content: str) -> list[SchemaEntity]:
     return [_build_entity(elem) for elem in _iter_entity_types(xml_content)]
 
 
+class EmptySchemaError(RuntimeError):
+    """`$metadata` was fetched successfully but declares zero `EntityType`s.
+
+    Real-world cause on 1C:Fresh trial tiers and some on-prem installs: the
+    standard OData endpoint is published, but no business objects (catalogs,
+    documents, registers) are marked as available via OData. Fix is operational,
+    not a connector bug — an admin must publish objects via Configurator or the
+    tenant's OData publication settings.
+    """
+
+
 async def discover_schema(
     base_url: str,
     username: str,
@@ -98,6 +109,11 @@ async def discover_schema(
         username: 1C service account username
         password: 1C service account password
         timeout: Request timeout in seconds (1C $metadata can be slow for large configs)
+
+    Raises:
+        EmptySchemaError: if `$metadata` parses successfully but contains no
+            `EntityType` declarations. Silent zero is a known 1C operational
+            footgun (trial infobases, unpublished objects) — surface it loudly.
     """
     metadata_url = f"{base_url.rstrip('/')}/$metadata"
 
@@ -109,4 +125,16 @@ async def discover_schema(
         response = await client.get(metadata_url)
         response.raise_for_status()
 
-    return parse_metadata_xml(response.text)
+    entities = parse_metadata_xml(response.text)
+    if not entities:
+        raise EmptySchemaError(
+            f"1C OData ({base_url}) вернул $metadata с нулём EntityType. "
+            "Транспорт OData опубликован, но ни один объект (справочник, документ, "
+            "регистр) не помечен как доступный через OData. Решение: в Конфигураторе "
+            "отметить объекты как публикуемые, либо через интерфейс администратора "
+            "включить автоматическую публикацию стандартного OData. "
+            "См. docs/TROUBLESHOOTING-1C.md. "
+            "[EN] Transport is published but no business objects exposed via OData. "
+            "See docs/TROUBLESHOOTING-1C.md for resolution steps."
+        )
+    return entities
