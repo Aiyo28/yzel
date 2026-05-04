@@ -246,6 +246,16 @@ Issues и PR приветствуются. Особенно:
 
 ---
 
+## Поддержать / Support
+
+Yzel некоммерческий и таким останется. Если он сэкономил вам время — можете угостить кофе:
+
+[![PayPal](https://img.shields.io/badge/PayPal-Buy%20me%20a%20coffee-00457C?logo=paypal&logoColor=white)](https://paypal.me/aiyo28)
+
+[paypal.me/aiyo28](https://paypal.me/aiyo28) — любая сумма, любая валюта / any amount, any currency.
+
+---
+
 ## Credits
 
 Автор: [Ayal Nogovitsyn](https://github.com/aiyo28). KZ-based, RU-speaking. Built because nobody else was going to build the 1C one.
