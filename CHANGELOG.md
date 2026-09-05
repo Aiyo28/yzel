@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.2] — 2026-09-05
+
+### Fixed
+- **0.1.1 was dead on arrival for every user.** `mcp>=1.0.0` had no upper bound. `uv.lock`
+  pins 1.27.0, so the 138 tests, `mypy --strict` and CI all ran against a working SDK — but a
+  real install resolves fresh, gets **mcp 2.1.1**, and every connector server module dies at
+  import with `AttributeError: 'Server' object has no attribute 'list_tools'`. Bounded to
+  `<2.0.0`.
+
+### Added
+- **CI now installs the built wheel with fresh dependency resolution and imports all eight
+  servers**, and runs weekly on a cron. The lockfile is what hid this: `uv sync` is not what a
+  user experiences, and nothing in the pipeline exercised the published artifact.
+
+### Known
+- The mcp 2.x port is not done. The pin is deliberate, not an oversight — lifting it requires
+  migrating the `@server.list_tools()` / `@server.call_tool()` handlers across all 8 servers.
+
 All notable changes to Yzel are recorded here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
 [SemVer](https://semver.org/spec/v2.0.0.html).

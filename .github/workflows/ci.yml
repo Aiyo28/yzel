@@ -5,6 +5,10 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  schedule:
+    # The published package resolves dependencies fresh, so a new upstream release can
+    # break installs with no commit here. mcp 2.x did exactly that to 0.1.1.
+    - cron: "0 5 * * 1"
   workflow_dispatch:
 
 jobs:
@@ -37,6 +41,26 @@ jobs:
         run: uv run ruff format --check .
       - name: mypy --strict
         run: uv run --with mypy mypy src/yzel
+
+  installed:
+    # Resolves WITHOUT uv.lock — this is what a user actually gets from `uvx`/`pip`.
+    # The lockfile pins a working mcp; the published package does not, and that gap
+    # shipped a package that died at import for everyone.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build
+      - name: Install the wheel with fresh resolution and import all 8 servers
+        run: |
+          uv run --no-project --with "$(ls dist/*.whl)" python -c "
+          import importlib, importlib.metadata as md
+          mods = ['onec','bitrix24','amocrm','moysklad','wildberries','ozon','telegram','iiko']
+          for m in mods:
+              mod = importlib.import_module(f'yzel.connectors.{m}.server')
+              assert callable(getattr(mod, 'run', None)), f'{m}: run() missing'
+          print(f'ok - 8 servers import against mcp {md.version(\"mcp\")}')
+          "
 
   build:
     runs-on: ubuntu-latest

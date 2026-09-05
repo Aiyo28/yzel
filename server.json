@@ -7,12 +7,12 @@
     "url": "https://github.com/Aiyo28/yzel",
     "source": "github"
   },
-  "version": "0.1.1",
+  "version": "0.1.2",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "yzel",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "runtimeHint": "uvx",
       "runtimeArguments": [
         {
