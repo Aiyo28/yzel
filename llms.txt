@@ -1,7 +1,7 @@
 # Yzel
 
 > MCP connectors for CIS business tools: 1C:Enterprise, Bitrix24, AmoCRM, МойСклад, Wildberries,
-> Ozon, Telegram, iiko. Eight stdio MCP servers in one Python package. Version 0.1.1, MIT.
+> Ozon, Telegram, iiko. Eight stdio MCP servers in one Python package. Version 0.1.3, MIT.
 
 This file is written for AI coding assistants. It is enough to install, configure and drive Yzel
 without reading the source. Do not invent tool names that are not listed here — the server

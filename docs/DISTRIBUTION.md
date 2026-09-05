@@ -1,6 +1,9 @@
 # Distribution — spec and update plan
 
 Written 2026-09-05 against `master` @ working tree (v0.1.1, uncommitted).
+**Status 2026-09-05, end of day: shipped.** `yzel 0.1.3` is on PyPI, listed in the MCP
+Registry as `isLatest`, and all 8 servers complete an MCP handshake from a clean install.
+The DAG below is kept as written; ✅ marks what landed. Live state lives in `NEXT.md`.
 Companion to `ROADMAP.md` (what gets built) — this covers **how it reaches anyone**.
 Tactical queue lives in `NEXT.md`; this is the reasoning behind that queue's order.
 
@@ -46,16 +49,16 @@ the people who already arrive a way to say it broke.
 
 ```mermaid
 graph TD
-  R[Commit + push working tree] --> CI[CI green on 3.11/3.12/3.13]
-  R --> PYPI[PyPI publish 0.1.1]
+  R[✅ Commit + push working tree] --> CI[✅ CI green on 3.11/3.12/3.13]
+  R --> PYPI[✅ PyPI publish — shipped 0.1.3]
   CI --> PYPI
-  PYPI --> SMOKE[Clean-machine check: uvx --from yzel yzel-1c]
-  SMOKE --> REG[MCP Registry: publish server.json]
-  SMOKE --> PLUG[Claude Code plugin: .mcp.json x8]
+  PYPI --> SMOKE[✅ Clean install + MCP handshake x8]
+  SMOKE --> REG[✅ MCP Registry: server.json published]
+  SMOKE --> PLUG[Plugin built — not yet in a marketplace]
   REG --> REG7[7 remaining per-connector registry entries]
   R --> FEED[Feedback loop: seed Discussions + triage protocol]
   FEED --> DRIFT[API-drift reports arrive]
-  R --> LINT[Lint + type pass, then gate them in CI]
+  R --> LINT[✅ Lint + types clean and gated]
   PLUG --> CONV[Cloners convert into installs and reports]
   REG7 --> CONV
   DRIFT --> CONV
