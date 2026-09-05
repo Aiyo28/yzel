@@ -10,12 +10,13 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
+from yzel import __version__
 from yzel.core.types import IikoCredential
 from yzel.core.vault import CredentialVault
 
 from .client import IikoClient, IikoError
 
-server = Server("yzel-iiko")
+server = Server("yzel-iiko", version=__version__)
 
 _client: IikoClient | None = None
 _connection_id: str | None = None

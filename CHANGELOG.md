@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.3] — 2026-09-05
+
+### Fixed
+- **Every MCP server reported the SDK's version as its own.** `Server("yzel-1c")` takes no
+  version, so the handshake advertised `serverInfo.version` = the installed `mcp` version
+  (1.29.1) instead of yzel's. Any client UI showed the wrong number, and a bug report quoting
+  it would have been useless. All 8 servers now pass `version=__version__`.
+- **`yzel --version` printed 0.1.0** while the package shipped 0.1.2. `__init__.py` hardcoded
+  the version and was never updated by the packaging work. It is now read from installed
+  package metadata, so pyproject.toml is the only place a version lives and this class of
+  drift cannot recur.
+
 ## [0.1.2] — 2026-09-05
 
 ### Fixed

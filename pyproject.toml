@@ -1,6 +1,6 @@
 [project]
 name = "yzel"
-version = "0.1.2"
+version = "0.1.3"
 description = "Unified MCP connectors for CIS business tools — 1C, Bitrix24, AmoCRM, Moysklad"
 readme = "README.md"
 license = "MIT"

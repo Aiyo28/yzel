@@ -14,12 +14,13 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
+from yzel import __version__
 from yzel.core.types import Bitrix24Credential
 from yzel.core.vault import CredentialVault
 
 from .client import Bitrix24Client, Bitrix24Error
 
-server = Server("yzel-bitrix24")
+server = Server("yzel-bitrix24", version=__version__)
 
 # Runtime state
 _client: Bitrix24Client | None = None

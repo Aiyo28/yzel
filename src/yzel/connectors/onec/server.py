@@ -14,13 +14,14 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
+from yzel import __version__
 from yzel.core.discovery import discover_schema
 from yzel.core.types import OneCCredential, SchemaEntity
 from yzel.core.vault import CredentialVault
 
 from .odata import OneCError, OneCODataClient
 
-server = Server("yzel-1c")
+server = Server("yzel-1c", version=__version__)
 
 # Runtime state
 _client: OneCODataClient | None = None

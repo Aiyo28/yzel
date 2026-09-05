@@ -14,12 +14,13 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
+from yzel import __version__
 from yzel.core.types import AmoCRMCredential
 from yzel.core.vault import CredentialVault
 
 from .client import AmoCRMClient
 
-server = Server("yzel-amocrm")
+server = Server("yzel-amocrm", version=__version__)
 
 # Runtime state
 _client: AmoCRMClient | None = None

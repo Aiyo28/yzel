@@ -15,12 +15,13 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
+from yzel import __version__
 from yzel.core.types import WildberriesCredential
 from yzel.core.vault import CredentialVault
 
 from .client import WildberriesClient, WildberriesError
 
-server = Server("yzel-wildberries")
+server = Server("yzel-wildberries", version=__version__)
 
 _client: WildberriesClient | None = None
 _connection_id: str | None = None
