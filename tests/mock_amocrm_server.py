@@ -15,8 +15,6 @@ Usage:
 
 from __future__ import annotations
 
-import json
-import time
 import uuid
 from typing import Any
 
@@ -55,6 +53,7 @@ def _check_auth(request: Request) -> Response | None:
 
 # --- Token endpoint ---
 
+
 async def oauth_token(request: Request) -> Response:
     """Handle OAuth2 token exchange and refresh."""
     global _current_access, _current_refresh
@@ -77,22 +76,26 @@ async def oauth_token(request: Request) -> Response:
         # Issue new tokens
         _current_access = f"refreshed_{uuid.uuid4().hex[:8]}"
         _current_refresh = f"refresh_{uuid.uuid4().hex[:8]}"
-        return JSONResponse({
-            "token_type": "Bearer",
-            "expires_in": _token_expires_in,
-            "access_token": _current_access,
-            "refresh_token": _current_refresh,
-        })
+        return JSONResponse(
+            {
+                "token_type": "Bearer",
+                "expires_in": _token_expires_in,
+                "access_token": _current_access,
+                "refresh_token": _current_refresh,
+            }
+        )
 
     elif grant_type == "authorization_code":
         _current_access = f"auth_{uuid.uuid4().hex[:8]}"
         _current_refresh = f"refresh_{uuid.uuid4().hex[:8]}"
-        return JSONResponse({
-            "token_type": "Bearer",
-            "expires_in": _token_expires_in,
-            "access_token": _current_access,
-            "refresh_token": _current_refresh,
-        })
+        return JSONResponse(
+            {
+                "token_type": "Bearer",
+                "expires_in": _token_expires_in,
+                "access_token": _current_access,
+                "refresh_token": _current_refresh,
+            }
+        )
 
     return JSONResponse(
         {"hint": f"Неизвестный grant_type: {grant_type}", "message": "Ошибка"},
@@ -229,6 +232,7 @@ _next_ids: dict[str, int] = {"leads": 100, "contacts": 100, "companies": 100}
 
 # --- Handlers ---
 
+
 async def entity_list(request: Request) -> Response:
     if err := _check_auth(request):
         return err
@@ -248,19 +252,19 @@ async def entity_list(request: Request) -> Response:
         query_lower = query.lower()
         items = [i for i in items if query_lower in i.get("name", "").lower()]
 
-    total = len(items)
-
     # Pagination
     page = int(request.query_params.get("page", 1))
     limit = int(request.query_params.get("limit", 50))
     start = (page - 1) * limit
     items = items[start : start + limit]
 
-    return JSONResponse({
-        "_page": page,
-        "_links": {"self": {"href": str(request.url)}},
-        "_embedded": {entity_type: items},
-    })
+    return JSONResponse(
+        {
+            "_page": page,
+            "_links": {"self": {"href": str(request.url)}},
+            "_embedded": {entity_type: items},
+        }
+    )
 
 
 async def entity_get(request: Request) -> Response:

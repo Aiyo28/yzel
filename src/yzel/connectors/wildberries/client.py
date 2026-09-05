@@ -166,7 +166,8 @@ class WildberriesClient:
 
     async def get_seller_info(self) -> dict[str, Any]:
         """Получить информацию о продавце / Seller info."""
-        return await self._request("common", "GET", "/api/v1/seller-info")
+        result: dict[str, Any] = await self._request("common", "GET", "/api/v1/seller-info")
+        return result
 
     # --- Warehouses ---
 
@@ -178,7 +179,8 @@ class WildberriesClient:
 
     async def get_new_orders(self) -> dict[str, Any]:
         """Новые сборочные задания (очередь FBS) / New FBS assembly orders."""
-        return await self._request("marketplace", "GET", "/api/v3/orders/new")
+        result: dict[str, Any] = await self._request("marketplace", "GET", "/api/v3/orders/new")
+        return result
 
     async def get_orders(
         self,
@@ -191,22 +193,24 @@ class WildberriesClient:
         params: dict[str, Any] = {"dateFrom": date_from, "limit": limit, "next": next_cursor}
         if date_to is not None:
             params["dateTo"] = date_to
-        return await self._request("marketplace", "GET", "/api/v3/orders", params=params)
+        result: dict[str, Any] = await self._request(
+            "marketplace", "GET", "/api/v3/orders", params=params
+        )
+        return result
 
     # --- Stocks ---
 
     async def get_stocks(self, warehouse_id: int, skus: list[str]) -> dict[str, Any]:
         """Остатки по SKU на складе / Stocks by SKU at warehouse."""
-        return await self._request(
+        result: dict[str, Any] = await self._request(
             "marketplace",
             "POST",
             f"/api/v3/stocks/{warehouse_id}",
             json_body={"skus": skus},
         )
+        return result
 
-    async def update_stocks(
-        self, warehouse_id: int, stocks: list[dict[str, Any]]
-    ) -> None:
+    async def update_stocks(self, warehouse_id: int, stocks: list[dict[str, Any]]) -> None:
         """Обновить остатки / Update stocks.
 
         stocks: list of {"sku": "barcode", "amount": int}
@@ -263,18 +267,22 @@ class WildberriesClient:
         }
         if cursor:
             body["settings"]["cursor"].update(cursor)
-        return await self._request("content", "POST", "/content/v2/get/cards/list", json_body=body)
+        result: dict[str, Any] = await self._request(
+            "content", "POST", "/content/v2/get/cards/list", json_body=body
+        )
+        return result
 
     # --- Prices ---
 
     async def get_prices(self, limit: int = 1000, offset: int = 0) -> dict[str, Any]:
         """Цены и скидки / Prices and discounts list."""
-        return await self._request(
+        result: dict[str, Any] = await self._request(
             "prices",
             "GET",
             "/api/v2/list/goods/filter",
             params={"limit": limit, "offset": offset},
         )
+        return result
 
     async def close(self) -> None:
         if self._client and not self._client.is_closed:

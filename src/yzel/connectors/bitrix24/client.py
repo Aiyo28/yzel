@@ -89,7 +89,8 @@ class Bitrix24Client:
                 description=description,
                 status_code=response.status_code,
             )
-        return data
+        result: dict[str, Any] = data
+        return result
 
     # --- CRM: Leads ---
 

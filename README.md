@@ -7,6 +7,10 @@
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![MCP Compatible](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io)
+[![CI](https://github.com/Aiyo28/yzel/actions/workflows/ci.yml/badge.svg)](https://github.com/Aiyo28/yzel/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/yzel.svg)](https://pypi.org/project/yzel/)
+
+<!-- mcp-name: io.github.Aiyo28/yzel -->
 
 Yzel подключает Claude, ChatGPT и других AI-ассистентов к 1С:Предприятию, Битрикс24, AmoCRM, МойСкладу, Wildberries, Ozon, Telegram и iiko — через [Model Context Protocol](https://modelcontextprotocol.io).
 
@@ -43,17 +47,29 @@ Yzel подключает Claude, ChatGPT и других AI-ассистент�
 
 ## Установка / Install
 
-**Из исходников / From source** (v0.1 — PyPI published after first launch feedback):
+Требуется Python 3.11+. Работает на Windows без WSL / Python 3.11+, works on Windows without WSL.
+
+**Ничего не устанавливать / Nothing to install** — рекомендуется. `uvx` скачивает и запускает
+пакет по требованию, поэтому в конфиге MCP-клиента не нужен ни клон, ни рабочая директория:
+
+```bash
+uvx --from yzel yzel --help
+```
+
+**Установить / Install:**
+
+```bash
+pip install yzel        # или: uv tool install yzel
+```
+
+**Из исходников / From source** (для разработки / for development):
 
 ```bash
 git clone https://github.com/Aiyo28/yzel.git
 cd yzel
-uv sync     # или: pip install -e .
+uv sync --extra dev
+uv run pytest           # 138 тестов / 138 tests
 ```
-
-Требуется Python 3.11+. Работает на Windows без WSL.
-
-PyPI (`pip install yzel`) — скоро, после сбора обратной связи с первых пользователей.
 
 ---
 
@@ -83,7 +99,7 @@ yzel config add-iiko        # iiko Cloud
 yzel config list
 ```
 
-Учётные данные хранятся зашифрованными (AES-256) в локальном SQLite-vault под `~/.yzel/vault.db`. Ничего не отправляется в облако.
+Учётные данные хранятся зашифрованными (AES-256) в локальном SQLite-vault под `~/.yzel/store.db`. Ничего не отправляется в облако.
 
 ### 2. Подключите к Claude Desktop / Wire into Claude Desktop
 
@@ -92,19 +108,22 @@ yzel config list
 ```json
 {
   "mcpServers": {
-    "yzel-1c": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "yzel.connectors.onec.server"]
-    },
-    "yzel-bitrix24": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "yzel.connectors.bitrix24.server"]
-    }
+    "yzel-1c":       { "command": "uvx", "args": ["--from", "yzel", "yzel-1c"] },
+    "yzel-bitrix24": { "command": "uvx", "args": ["--from", "yzel", "yzel-bitrix24"] }
   }
 }
 ```
 
 Каждый коннектор — отдельный MCP-сервер. Подключайте только те, которые нужны.
+
+| Коннектор | Команда / command | Коннектор | Команда / command |
+|---|---|---|---|
+| 1С | `yzel-1c` | Ozon | `yzel-ozon` |
+| Битрикс24 | `yzel-bitrix24` | Telegram | `yzel-telegram` |
+| AmoCRM | `yzel-amocrm` | iiko | `yzel-iiko` |
+| МойСклад | `yzel-moysklad` | Wildberries | `yzel-wildberries` |
+
+Каждая — `{ "command": "uvx", "args": ["--from", "yzel", "<команда>"] }`.
 
 ### 3. Спрашивайте данные у AI / Ask the AI
 
@@ -158,7 +177,7 @@ uv run python -m yzel.connectors.iiko.server
 ## Архитектура / Architecture
 
 ```
-~/.yzel/vault.db        ← зашифрованные credentials (AES-256)
+~/.yzel/store.db       ← зашифрованные credentials (AES-256)
        │
        ├── Yzel CLI     ← добавление/удаление подключений
        │

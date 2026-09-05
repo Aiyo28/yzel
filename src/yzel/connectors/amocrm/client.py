@@ -11,7 +11,8 @@ OAuth2 auth with automatic token refresh. Key gotchas:
 from __future__ import annotations
 
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import httpx
 
@@ -85,9 +86,7 @@ class AmoCRMClient:
                 hint = body.get("hint", body.get("message", ""))
             except (ValueError, KeyError):
                 hint = response.text
-            raise AmoCRMAuthError(
-                f"Ошибка обновления токена: {response.status_code}. {hint}"
-            )
+            raise AmoCRMAuthError(f"Ошибка обновления токена: {response.status_code}. {hint}")
 
         data = response.json()
         self._access_token = data["access_token"]
@@ -141,7 +140,7 @@ class AmoCRMClient:
         method: str,
         path: str,
         params: dict[str, Any] | None = None,
-        json_data: dict[str, Any] | None = None,
+        json_data: dict[str, Any] | list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Make an authenticated API request with auto token refresh."""
         await self._ensure_auth()
@@ -181,7 +180,8 @@ class AmoCRMClient:
             except (ValueError, KeyError):
                 response.raise_for_status()
 
-        return response.json()
+        result: dict[str, Any] = response.json()
+        return result
 
     # --- Leads (Сделки) ---
 
@@ -234,7 +234,9 @@ class AmoCRMClient:
             params["with"] = ",".join(with_params)
         return await self._request("GET", "contacts", params=params)
 
-    async def get_contact(self, contact_id: int, with_params: list[str] | None = None) -> dict[str, Any]:
+    async def get_contact(
+        self, contact_id: int, with_params: list[str] | None = None
+    ) -> dict[str, Any]:
         """Получить контакт по ID / Get contact by ID."""
         params = {"with": ",".join(with_params)} if with_params else None
         return await self._request("GET", f"contacts/{contact_id}", params=params)

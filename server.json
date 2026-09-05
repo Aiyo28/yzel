@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Aiyo28/yzel",
+  "title": "Yzel — 1C:Enterprise",
+  "description": "Query and update 1C:Enterprise over OData v3. Cyrillic-aware, Fresh and on-prem.",
+  "repository": {
+    "url": "https://github.com/Aiyo28/yzel",
+    "source": "github"
+  },
+  "version": "0.1.1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "yzel",
+      "version": "0.1.1",
+      "runtimeHint": "uvx",
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--from",
+          "value": "yzel"
+        },
+        {
+          "type": "positional",
+          "valueHint": "connector",
+          "value": "yzel-1c"
+        }
+      ],
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "YZEL_KEY",
+          "description": "AES-256 key for the local credential vault at ~/.yzel/store.db. Optional — if unset, a key is generated at ~/.yzel/vault.key on first run.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

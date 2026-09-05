@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import httpx
 import pytest
 import uvicorn
 
-from yzel.connectors.iiko.client import IikoClient, IikoError, RateLimiter
 from tests import mock_iiko_server
 from tests.mock_iiko_server import VALID_API_LOGIN, app
+from yzel.connectors.iiko.client import IikoClient, IikoError, RateLimiter
 
 MOCK_PORT = 8183
 MOCK_URL = f"http://127.0.0.1:{MOCK_PORT}"

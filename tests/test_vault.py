@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from yzel.core.types import Bitrix24Credential, OneCCredential, ServiceType
+from yzel.core.types import Bitrix24Credential, OneCCredential
 from yzel.core.vault import CredentialVault
-
 
 # Test fixtures use obviously fake values — not real secrets
 _TEST_1C_HOST = "https://test.example.com/base/odata/standard.odata"
@@ -48,8 +47,10 @@ def test_store_and_retrieve_bitrix(temp_vault: CredentialVault) -> None:
 def test_list_connections(temp_vault: CredentialVault) -> None:
     """List all stored connections."""
     cred1 = OneCCredential(
-        name="База 1", host="https://a.example.com",
-        username="u", password="test_value",  # noqa: S106
+        name="База 1",
+        host="https://a.example.com",
+        username="u",
+        password="test_value",  # noqa: S106
     )
     cred2 = Bitrix24Credential(name="Портал", webhook_url=_TEST_WEBHOOK)
 
@@ -65,8 +66,10 @@ def test_list_connections(temp_vault: CredentialVault) -> None:
 def test_delete_connection(temp_vault: CredentialVault) -> None:
     """Delete a connection."""
     cred = OneCCredential(
-        name="Удалить", host="https://x.example.com",
-        username="u", password="test_value",  # noqa: S106
+        name="Удалить",
+        host="https://x.example.com",
+        username="u",
+        password="test_value",  # noqa: S106
     )
     temp_vault.store("to-delete", cred)
 
@@ -83,12 +86,16 @@ def test_get_nonexistent(temp_vault: CredentialVault) -> None:
 def test_update_credential(temp_vault: CredentialVault) -> None:
     """Updating a credential overwrites the previous value."""
     cred1 = OneCCredential(
-        name="v1", host="https://old.example.com",
-        username="u", password="test_value_old",  # noqa: S106
+        name="v1",
+        host="https://old.example.com",
+        username="u",
+        password="test_value_old",  # noqa: S106
     )
     cred2 = OneCCredential(
-        name="v2", host="https://new.example.com",
-        username="u", password="test_value_new",  # noqa: S106
+        name="v2",
+        host="https://new.example.com",
+        username="u",
+        password="test_value_new",  # noqa: S106
     )
 
     temp_vault.store("update-me", cred1)

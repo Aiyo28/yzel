@@ -111,7 +111,11 @@ CARDS = {
 PRICES = {
     "data": {
         "listGoods": [
-            {"nmID": 111111, "vendorCode": "BUM-A4-500", "prices": [{"price": 1200, "discount": 10}]},
+            {
+                "nmID": 111111,
+                "vendorCode": "BUM-A4-500",
+                "prices": [{"price": 1200, "discount": 10}],
+            },
             {"nmID": 222222, "vendorCode": "DT-L-001", "prices": [{"price": 85000, "discount": 5}]},
         ]
     }
@@ -160,9 +164,7 @@ async def get_stocks(request: Request) -> Response:
     body = await request.json()
     skus = body.get("skus", [])
     available = STOCKS_BY_WAREHOUSE.get(warehouse_id, {})
-    return JSONResponse(
-        {"stocks": [{"sku": s, "amount": available.get(s, 0)} for s in skus]}
-    )
+    return JSONResponse({"stocks": [{"sku": s, "amount": available.get(s, 0)} for s in skus]})
 
 
 async def put_stocks(request: Request) -> Response:

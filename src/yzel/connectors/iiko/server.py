@@ -32,9 +32,7 @@ async def _ensure_client() -> IikoClient:
     iiko_connections = [c for c in connections if c["service"] == "iiko"]
 
     if not iiko_connections:
-        raise RuntimeError(
-            "Нет настроенных подключений к iiko. Используйте 'yzel config add-iiko'"
-        )
+        raise RuntimeError("Нет настроенных подключений к iiko. Используйте 'yzel config add-iiko'")
 
     _connection_id = iiko_connections[0]["id"]
     cred = vault.get(_connection_id)
@@ -158,14 +156,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         client = await _ensure_client()
 
         if name == "iiko_organizations":
-            return _as_text(
-                await client.get_organizations(arguments.get("organization_ids"))
-            )
+            return _as_text(await client.get_organizations(arguments.get("organization_ids")))
 
         if name == "iiko_terminal_groups":
-            return _as_text(
-                await client.get_terminal_groups(arguments["organization_ids"])
-            )
+            return _as_text(await client.get_terminal_groups(arguments["organization_ids"]))
 
         if name == "iiko_nomenclature":
             return _as_text(await client.get_nomenclature(arguments["organization_id"]))
@@ -212,5 +206,10 @@ async def main() -> None:
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
 
-if __name__ == "__main__":
+def run() -> None:
+    """Console-script entry point (see [project.scripts]). Sync wrapper for main()."""
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    run()

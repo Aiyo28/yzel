@@ -1,0 +1,43 @@
+name: API drift / Сервис изменил API
+description: A vendor changed their API and yzel now parses it wrong.
+labels: ["api-drift"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Yzel's 138 tests run against mock servers written by this repo. They cannot detect that
+        a vendor changed their API — only you can. This is the single most useful report we get.
+
+        Тесты Yzel гоняются против моков, написанных здесь же. Они физически не видят, что
+        сервис поменял свой API — это видно только вам.
+
+  - type: dropdown
+    id: connector
+    attributes:
+      label: Коннектор / Connector
+      options: ["1C", "Bitrix24", "AmoCRM", "МойСклад", "Wildberries", "Ozon", "Telegram", "iiko"]
+    validations:
+      required: true
+
+  - type: input
+    id: tool
+    attributes:
+      label: Инструмент / Tool
+      placeholder: "ozon_list_postings"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Реальный ответ сервиса / Actual response
+      description: Тело ответа. **Уберите персональные данные, суммы и токены.** / Strip PII, amounts and tokens.
+      render: json
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Что ожидал yzel / What yzel expected
+      description: Ошибка парсинга или отличие от `tests/mock_*_server.py`, если знаете.

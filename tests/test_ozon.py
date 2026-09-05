@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import httpx
 import pytest
 import uvicorn
 
-from yzel.connectors.ozon.client import OzonClient, OzonError, RateLimiter
 from tests.mock_ozon_server import app
+from yzel.connectors.ozon.client import OzonClient, OzonError, RateLimiter
 
 MOCK_PORT = 8181
 MOCK_URL = f"http://127.0.0.1:{MOCK_PORT}"
@@ -123,9 +123,7 @@ async def test_unfulfilled_postings(client: OzonClient) -> None:
 
 
 async def test_list_postings_forwards_date_filter(client: OzonClient) -> None:
-    res = await client.list_postings(
-        since="2026-04-01T00:00:00Z", to="2026-04-30T00:00:00Z"
-    )
+    res = await client.list_postings(since="2026-04-01T00:00:00Z", to="2026-04-30T00:00:00Z")
     assert res["since"] == "2026-04-01T00:00:00Z"
     assert res["to"] == "2026-04-30T00:00:00Z"
 

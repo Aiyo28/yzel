@@ -88,7 +88,8 @@ class MoyskladClient:
         if response.status_code >= 400:
             raise _parse_moysklad_error(response)
 
-        return response.json()
+        result: dict[str, Any] = response.json()
+        return result
 
     def _list_params(
         self,
@@ -126,8 +127,9 @@ class MoyskladClient:
         expand: str | None = None,
     ) -> dict[str, Any]:
         """Получить список контрагентов / Get counterparties."""
-        params = self._list_params(limit=limit, offset=offset, filter_expr=filter_expr,
-                                   search=search, expand=expand)
+        params = self._list_params(
+            limit=limit, offset=offset, filter_expr=filter_expr, search=search, expand=expand
+        )
         return await self._request("GET", "entity/counterparty", params=params)
 
     async def get_counterparty(self, entity_id: str, expand: str | None = None) -> dict[str, Any]:
@@ -154,8 +156,9 @@ class MoyskladClient:
         expand: str | None = None,
     ) -> dict[str, Any]:
         """Получить список товаров / Get products."""
-        params = self._list_params(limit=limit, offset=offset, filter_expr=filter_expr,
-                                   search=search, expand=expand)
+        params = self._list_params(
+            limit=limit, offset=offset, filter_expr=filter_expr, search=search, expand=expand
+        )
         return await self._request("GET", "entity/product", params=params)
 
     async def get_product(self, entity_id: str, expand: str | None = None) -> dict[str, Any]:
@@ -182,8 +185,9 @@ class MoyskladClient:
         order: str | None = None,
     ) -> dict[str, Any]:
         """Получить список заказов покупателей / Get customer orders."""
-        params = self._list_params(limit=limit, offset=offset, filter_expr=filter_expr,
-                                   expand=expand, order=order)
+        params = self._list_params(
+            limit=limit, offset=offset, filter_expr=filter_expr, expand=expand, order=order
+        )
         return await self._request("GET", "entity/customerorder", params=params)
 
     async def get_customer_order(self, entity_id: str, expand: str | None = None) -> dict[str, Any]:

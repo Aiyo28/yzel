@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --extra dev --python ${{ matrix.python-version }}
+      - name: Run the suite (mock-backed; see docs/TESTING.md for what this does not cover)
+        run: uv run pytest -q
+
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --extra dev
+      - name: ruff check
+        run: uv run ruff check .
+      - name: ruff format
+        run: uv run ruff format --check .
+      - name: mypy --strict
+        run: uv run --with mypy mypy src/yzel
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build
+      - name: Check console scripts resolve
+        run: |
+          uv sync
+          uv run python -c "
+          import importlib
+          mods = ['onec','bitrix24','amocrm','moysklad','wildberries','ozon','telegram','iiko']
+          bad = [m for m in mods if not callable(getattr(importlib.import_module(f'yzel.connectors.{m}.server'), 'run', None))]
+          raise SystemExit(f'broken entry points: {bad}' if bad else 0)
+          "
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/

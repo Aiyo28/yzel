@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import io
 import xml.etree.ElementTree as ET
+from collections.abc import Iterator
 
 import httpx
 
@@ -46,7 +47,7 @@ _ENTITY_TYPE_TAG = f"{{{_EDM_NS}}}EntityType"
 _PROPERTY_TAG = f"{{{_EDM_NS}}}Property"
 
 
-def _iter_entity_types(source: io.IOBase | str):
+def _iter_entity_types(source: io.IOBase | str) -> Iterator[ET.Element]:
     """Yield `EntityType` elements from an XML source using iterparse.
 
     Accepts a string (wrapped in BytesIO) or a file-like object. Elements

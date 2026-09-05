@@ -7,7 +7,7 @@ src/yzel/
 ├── cli.py               # yzel CLI — config add-*, list, remove
 ├── core/
 │   ├── types.py         # ServiceCredential + 8 subclasses + EntityRecord + SchemaEntity
-│   ├── vault.py         # SQLite vault, AES-256 at rest, ~/.yzel/vault.db
+│   ├── vault.py         # SQLite vault, AES-256 at rest, ~/.yzel/store.db
 │   └── discovery.py     # Dynamic schema discovery (1C $metadata streaming parser)
 └── connectors/
     ├── onec/            # 1C Enterprise (OData v3 + JSON)
@@ -36,7 +36,7 @@ Every connector is an independent package with:
 CLI (yzel config add-1c)
   → OneCCredential(host, username, password, is_fresh)
   → CredentialVault.store(connection_id, cred)
-  → SQLite (~/.yzel/vault.db) with AES-256-GCM encrypted blob
+  → SQLite (~/.yzel/store.db) with AES-256-GCM encrypted blob
 
 MCP Server startup
   → CredentialVault.list_connections()

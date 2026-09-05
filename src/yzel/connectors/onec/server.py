@@ -64,12 +64,22 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="onec_query",
-            description="Запросить данные из 1С по имени объекта. Примеры: Catalog_Контрагенты, Document_РеализацияТоваровУслуг",
+            description=(
+                "Запросить данные из 1С по имени объекта. "
+                "Примеры: Catalog_Контрагенты, Document_РеализацияТоваровУслуг"
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "entity": {"type": "string", "description": "Имя объекта OData (например, Catalog_Контрагенты)"},
-                    "top": {"type": "integer", "description": "Максимальное количество записей", "default": 20},
+                    "entity": {
+                        "type": "string",
+                        "description": "Имя объекта OData (например, Catalog_Контрагенты)",
+                    },
+                    "top": {
+                        "type": "integer",
+                        "description": "Максимальное количество записей",
+                        "default": 20,
+                    },
                     "filter": {"type": "string", "description": "OData $filter выражение"},
                     "select": {
                         "type": "array",
@@ -192,7 +202,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 ]
             schema = matching[0]
             return _as_text(
-                [{"name": f.name, "type": f.field_type, "nullable": f.nullable} for f in schema.fields]
+                [
+                    {"name": f.name, "type": f.field_type, "nullable": f.nullable}
+                    for f in schema.fields
+                ]
             )
 
         if name == "onec_count":
@@ -227,5 +240,10 @@ async def main() -> None:
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
 
-if __name__ == "__main__":
+def run() -> None:
+    """Console-script entry point (see [project.scripts]). Sync wrapper for main()."""
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    run()

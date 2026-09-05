@@ -142,7 +142,9 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="tg_get_updates",
-            description="Получить обновления (long-polling). Не использовать одновременно с webhook",
+            description=(
+                "Получить обновления (long-polling). Не использовать одновременно с webhook"
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -290,11 +292,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
 
     except TelegramError as exc:
-        hint = (
-            f" — подождите {exc.retry_after}с"
-            if exc.retry_after
-            else ""
-        )
+        hint = f" — подождите {exc.retry_after}с" if exc.retry_after else ""
         return [TextContent(type="text", text=f"Ошибка Telegram: {exc.description}{hint}")]
 
 
@@ -303,5 +301,10 @@ async def main() -> None:
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
 
-if __name__ == "__main__":
+def run() -> None:
+    """Console-script entry point (see [project.scripts]). Sync wrapper for main()."""
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    run()

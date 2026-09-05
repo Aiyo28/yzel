@@ -37,23 +37,17 @@ def invalidate_current_token() -> None:
 def _auth(request: Request) -> JSONResponse | None:
     auth = request.headers.get("authorization", "")
     if not auth.startswith("Bearer "):
-        return JSONResponse(
-            {"errorDescription": "Отсутствует токен"}, status_code=401
-        )
+        return JSONResponse({"errorDescription": "Отсутствует токен"}, status_code=401)
     token = auth[len("Bearer ") :]
     if _current_token is None or token != _current_token:
-        return JSONResponse(
-            {"errorDescription": "Токен недействителен"}, status_code=401
-        )
+        return JSONResponse({"errorDescription": "Токен недействителен"}, status_code=401)
     return None
 
 
 async def access_token(request: Request) -> JSONResponse:
     body = await request.json()
     if body.get("apiLogin") != VALID_API_LOGIN:
-        return JSONResponse(
-            {"errorDescription": "apiLogin не найден"}, status_code=401
-        )
+        return JSONResponse({"errorDescription": "apiLogin не найден"}, status_code=401)
     return JSONResponse({"token": _mint_token()})
 
 
@@ -103,14 +97,10 @@ PAYMENT_TYPES = {
     ]
 }
 
-EMPLOYEES = {
-    "org-1": [{"id": "emp-1", "firstName": "Иван", "lastName": "Петров"}]
-}
+EMPLOYEES = {"org-1": [{"id": "emp-1", "firstName": "Иван", "lastName": "Петров"}]}
 
 DELIVERIES_BY_PHONE: dict[tuple[str, str], list[dict]] = {
-    ("org-1", "+77011234567"): [
-        {"id": "ord-1", "phone": "+77011234567", "total": 3200}
-    ]
+    ("org-1", "+77011234567"): [{"id": "ord-1", "phone": "+77011234567", "total": 3200}]
 }
 
 CREATED_ORDERS: list[dict] = []
@@ -121,11 +111,7 @@ async def organizations(request: Request) -> JSONResponse:
         return err
     body = await request.json()
     wanted = body.get("organizationIds")
-    orgs = (
-        [o for o in ORGANIZATIONS if o["id"] in set(wanted)]
-        if wanted
-        else ORGANIZATIONS
-    )
+    orgs = [o for o in ORGANIZATIONS if o["id"] in set(wanted)] if wanted else ORGANIZATIONS
     return JSONResponse({"organizations": orgs})
 
 
@@ -195,9 +181,7 @@ async def order_types(request: Request) -> JSONResponse:
     body = await request.json()
     result = []
     for org_id in body.get("organizationIds", []):
-        result.append(
-            {"organizationId": org_id, "items": ORDER_TYPES.get(org_id, [])}
-        )
+        result.append({"organizationId": org_id, "items": ORDER_TYPES.get(org_id, [])})
     return JSONResponse({"orderTypes": result})
 
 

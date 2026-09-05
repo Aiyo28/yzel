@@ -4,17 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import time
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import httpx
 import pytest
 import uvicorn
 
-from yzel.connectors.bitrix24.client import Bitrix24Client, Bitrix24Error, RateLimiter
-
 # Re-import to reset state each test run
 from tests.mock_bitrix24_server import app
+from yzel.connectors.bitrix24.client import Bitrix24Client, Bitrix24Error, RateLimiter
 
 MOCK_PORT = 8178  # Different from dev port to avoid conflicts
 MOCK_WEBHOOK = f"http://localhost:{MOCK_PORT}/rest/1/test_webhook_secret"
@@ -34,7 +32,9 @@ class _ServerThread:
         for _ in range(50):
             try:
                 async with httpx.AsyncClient() as c:
-                    await c.get(f"http://127.0.0.1:{MOCK_PORT}/rest/1/test_webhook_secret/crm.lead.list.json")
+                    await c.get(
+                        f"http://127.0.0.1:{MOCK_PORT}/rest/1/test_webhook_secret/crm.lead.list.json"
+                    )
                 return
             except httpx.ConnectError:
                 await asyncio.sleep(0.1)
@@ -137,10 +137,12 @@ async def test_get_deal_by_id(client: Bitrix24Client) -> None:
 
 async def test_create_deal(client: Bitrix24Client) -> None:
     """Create a new deal."""
-    result = await client.create_deal({
-        "TITLE": "Тестовая сделка",
-        "OPPORTUNITY": "999999",
-    })
+    result = await client.create_deal(
+        {
+            "TITLE": "Тестовая сделка",
+            "OPPORTUNITY": "999999",
+        }
+    )
     assert result["result"] >= 100
 
 

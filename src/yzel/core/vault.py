@@ -85,7 +85,8 @@ class CredentialVault:
         return self._fernet.encrypt(json.dumps(data).encode())
 
     def _decrypt(self, encrypted: bytes) -> dict[str, Any]:
-        return json.loads(self._fernet.decrypt(encrypted))
+        result: dict[str, Any] = json.loads(self._fernet.decrypt(encrypted))
+        return result
 
     def store(self, connection_id: str, credential: ServiceCredential) -> None:
         """Store or update a connection credential."""

@@ -8,18 +8,18 @@ setting max_per_second very high.
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import httpx
 import pytest
 import uvicorn
 
+from tests.mock_wildberries_server import app
 from yzel.connectors.wildberries.client import (
     RateLimiter,
     WildberriesClient,
     WildberriesError,
 )
-from tests.mock_wildberries_server import app
 
 MOCK_PORT = 8179
 MOCK_URL = f"http://127.0.0.1:{MOCK_PORT}"

@@ -13,7 +13,7 @@
 | Telegram Bot | 12 MCP tools, `retry_after` handling, self-hosted Bot API support |
 | iiko Cloud | `apiLogin` → 1h Bearer auto-refresh on 401, 9 MCP tools (organizations, terminal groups, nomenclature, deliveries, etc.) |
 
-137 tests across all connectors.
+138 tests across all connectors.
 
 ## v0.2 — Next
 

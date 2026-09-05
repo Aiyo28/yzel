@@ -36,11 +36,13 @@ def _on_token_refresh(access_token: str, refresh_token: str, expires_at: float) 
     if not isinstance(cred, AmoCRMCredential):
         return
 
-    updated = cred.model_copy(update={
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "expires_at": expires_at,
-    })
+    updated = cred.model_copy(
+        update={
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "expires_at": expires_at,
+        }
+    )
     _vault.store(_connection_id, updated)
 
 
@@ -135,7 +137,9 @@ async def list_tools() -> list[Tool]:
                     "with": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "Связанные данные (например, ['contacts', 'catalog_elements'])",
+                        "description": (
+                            "Связанные данные (например, ['contacts', 'catalog_elements'])"
+                        ),
                     },
                 },
                 "required": ["entity"],
@@ -303,5 +307,10 @@ async def main() -> None:
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
 
-if __name__ == "__main__":
+def run() -> None:
+    """Console-script entry point (see [project.scripts]). Sync wrapper for main()."""
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    run()

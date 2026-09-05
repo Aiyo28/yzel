@@ -35,9 +35,7 @@ async def _ensure_client() -> OzonClient:
     ozon_connections = [c for c in connections if c["service"] == "ozon"]
 
     if not ozon_connections:
-        raise RuntimeError(
-            "Нет настроенных подключений к Ozon. Используйте 'yzel config add-ozon'"
-        )
+        raise RuntimeError("Нет настроенных подключений к Ozon. Используйте 'yzel config add-ozon'")
 
     _connection_id = ozon_connections[0]["id"]
     cred = vault.get(_connection_id)
@@ -289,5 +287,10 @@ async def main() -> None:
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
 
-if __name__ == "__main__":
+def run() -> None:
+    """Console-script entry point (see [project.scripts]). Sync wrapper for main()."""
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    run()

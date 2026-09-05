@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Вопрос по настройке / Setup question
+    url: https://github.com/Aiyo28/yzel/discussions
+    about: Не уверены, что это баг? Спросите в Discussions. / Not sure it's a bug? Ask in Discussions.
+  - name: 1С — EmptySchemaError и OData
+    url: https://github.com/Aiyo28/yzel/blob/master/docs/TROUBLESHOOTING-1C.md
+    about: Самая частая проблема с 1С разобрана здесь. / The most common 1C problem is covered here.
+  - name: Уязвимость / Security vulnerability
+    url: https://github.com/Aiyo28/yzel/blob/master/SECURITY.md
+    about: Не открывайте публичный issue. / Do not open a public issue.

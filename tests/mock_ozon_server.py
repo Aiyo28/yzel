@@ -74,9 +74,7 @@ async def product_list(request: Request) -> Response:
     body = await request.json()
     limit = body.get("limit", 100)
     items = [{"product_id": p["product_id"], "offer_id": p["offer_id"]} for p in PRODUCTS]
-    return JSONResponse(
-        {"result": {"items": items[:limit], "total": len(PRODUCTS), "last_id": ""}}
-    )
+    return JSONResponse({"result": {"items": items[:limit], "total": len(PRODUCTS), "last_id": ""}})
 
 
 async def product_info(request: Request) -> Response:
@@ -221,5 +219,7 @@ app = Starlette(
 if __name__ == "__main__":
     import uvicorn
 
-    print("🔵 Mock Ozon Seller API — http://localhost:8080 — Client-Id: 123456 / Api-Key: test-ozon-key")
+    print(
+        "🔵 Mock Ozon Seller API — http://localhost:8080 — Client-Id: 123456 / Api-Key: test-ozon-key"
+    )
     uvicorn.run(app, host="0.0.0.0", port=8080)

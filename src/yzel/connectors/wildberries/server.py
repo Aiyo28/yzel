@@ -76,8 +76,14 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "date_from": {"type": "integer", "description": "Unix timestamp начала периода"},
-                    "date_to": {"type": "integer", "description": "Unix timestamp конца периода (опционально)"},
+                    "date_from": {
+                        "type": "integer",
+                        "description": "Unix timestamp начала периода",
+                    },
+                    "date_to": {
+                        "type": "integer",
+                        "description": "Unix timestamp конца периода (опционально)",
+                    },
                     "limit": {"type": "integer", "default": 1000},
                     "next_cursor": {"type": "integer", "default": 0},
                 },
@@ -153,7 +159,10 @@ async def list_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "default": 100},
-                    "cursor": {"type": "object", "description": "Курсор продолжения с предыдущего вызова"},
+                    "cursor": {
+                        "type": "object",
+                        "description": "Курсор продолжения с предыдущего вызова",
+                    },
                 },
             },
         ),
@@ -200,9 +209,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             )
 
         if name == "wb_get_stocks":
-            return _as_text(
-                await client.get_stocks(arguments["warehouse_id"], arguments["skus"])
-            )
+            return _as_text(await client.get_stocks(arguments["warehouse_id"], arguments["skus"]))
 
         if name == "wb_update_stocks":
             await client.update_stocks(arguments["warehouse_id"], arguments["stocks"])
@@ -243,5 +250,10 @@ async def main() -> None:
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
 
-if __name__ == "__main__":
+def run() -> None:
+    """Console-script entry point (see [project.scripts]). Sync wrapper for main()."""
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    run()

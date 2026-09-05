@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import httpx
 import pytest
 import uvicorn
 
-from yzel.connectors.moysklad.client import MoyskladClient, MoyskladError, RateLimiter
-
 from tests.mock_moysklad_server import VALID_TOKEN, app
+from yzel.connectors.moysklad.client import MoyskladClient, MoyskladError, RateLimiter
 
 MOCK_PORT = 8179
 MOCK_BASE = f"http://localhost:{MOCK_PORT}/api/remap/1.2"

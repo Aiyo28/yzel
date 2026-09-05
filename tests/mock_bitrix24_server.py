@@ -287,6 +287,7 @@ def _handle_task_update(params: dict[str, Any]) -> dict[str, Any]:
 
 # --- Starlette Handler ---
 
+
 async def rest_handler(request: Request) -> JSONResponse:
     """Handle all Bitrix24 REST API calls."""
     method_raw = request.path_params["method"]

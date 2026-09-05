@@ -1,0 +1,68 @@
+{
+  "mcpServers": {
+    "yzel-1c": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "yzel",
+        "yzel-1c"
+      ]
+    },
+    "yzel-bitrix24": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "yzel",
+        "yzel-bitrix24"
+      ]
+    },
+    "yzel-amocrm": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "yzel",
+        "yzel-amocrm"
+      ]
+    },
+    "yzel-moysklad": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "yzel",
+        "yzel-moysklad"
+      ]
+    },
+    "yzel-wildberries": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "yzel",
+        "yzel-wildberries"
+      ]
+    },
+    "yzel-ozon": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "yzel",
+        "yzel-ozon"
+      ]
+    },
+    "yzel-telegram": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "yzel",
+        "yzel-telegram"
+      ]
+    },
+    "yzel-iiko": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "yzel",
+        "yzel-iiko"
+      ]
+    }
+  }
+}

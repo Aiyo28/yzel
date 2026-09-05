@@ -20,7 +20,11 @@ def config() -> None:
 
 @config.command("add-1c")
 @click.option("--name", prompt="Имя подключения", help="Connection name")
-@click.option("--host", prompt="URL OData (https://server/base/odata/standard.odata)", help="OData endpoint URL")
+@click.option(
+    "--host",
+    prompt="URL OData (https://server/base/odata/standard.odata)",
+    help="OData endpoint URL",
+)
 @click.option("--username", prompt="Имя пользователя", help="1C username")
 @click.option("--password", prompt=True, hide_input=True, help="1C password")
 @click.option("--fresh", is_flag=True, default=False, help="1C:Fresh cloud deployment")
@@ -82,11 +86,17 @@ def add_moysklad(name: str, token: str) -> None:
 @click.option("--name", prompt="Имя подключения", help="Connection name")
 @click.option("--subdomain", prompt="Поддомен AmoCRM (mycompany)", help="AmoCRM subdomain")
 @click.option("--client-id", prompt="Client ID", help="OAuth2 client ID")
-@click.option("--client-secret", prompt="Client Secret", hide_input=True, help="OAuth2 client secret")
+@click.option(
+    "--client-secret", prompt="Client Secret", hide_input=True, help="OAuth2 client secret"
+)
 @click.option("--redirect-uri", prompt="Redirect URI", help="OAuth2 redirect URI")
 @click.option("--access-token", prompt="Access Token", hide_input=True, help="OAuth2 access token")
-@click.option("--refresh-token", prompt="Refresh Token", hide_input=True, help="OAuth2 refresh token")
-@click.option("--expires-at", prompt="Expires at (unix timestamp)", type=float, help="Access token expiry")
+@click.option(
+    "--refresh-token", prompt="Refresh Token", hide_input=True, help="OAuth2 refresh token"
+)
+@click.option(
+    "--expires-at", prompt="Expires at (unix timestamp)", type=float, help="Access token expiry"
+)
 def add_amocrm(
     name: str,
     subdomain: str,
@@ -123,7 +133,9 @@ def add_amocrm(
 
 @config.command("add-wildberries")
 @click.option("--name", prompt="Имя подключения", help="Connection name")
-@click.option("--api-key", prompt="API Key (JWT)", hide_input=True, help="WB seller cabinet JWT token")
+@click.option(
+    "--api-key", prompt="API Key (JWT)", hide_input=True, help="WB seller cabinet JWT token"
+)
 @click.option("--sandbox", is_flag=True, default=False, help="Use WB sandbox hosts")
 def add_wildberries(name: str, api_key: str, sandbox: bool) -> None:
     """Добавить подключение к Wildberries / Add Wildberries connection."""
@@ -161,7 +173,9 @@ def add_ozon(name: str, client_id: str, api_key: str, sandbox: bool) -> None:
 
 @config.command("add-telegram")
 @click.option("--name", prompt="Имя подключения", help="Connection name")
-@click.option("--bot-token", prompt="Bot Token (@BotFather)", hide_input=True, help="Token from @BotFather")
+@click.option(
+    "--bot-token", prompt="Bot Token (@BotFather)", hide_input=True, help="Token from @BotFather"
+)
 def add_telegram(name: str, bot_token: str) -> None:
     """Добавить подключение к Telegram Bot / Add Telegram bot connection."""
     import uuid
@@ -178,7 +192,12 @@ def add_telegram(name: str, bot_token: str) -> None:
 
 @config.command("add-iiko")
 @click.option("--name", prompt="Имя подключения", help="Connection name")
-@click.option("--api-login", prompt="apiLogin", hide_input=True, help="apiLogin from iikoWeb (Настройки → API)")
+@click.option(
+    "--api-login",
+    prompt="apiLogin",
+    hide_input=True,
+    help="apiLogin from iikoWeb (Настройки → API)",
+)
 def add_iiko(name: str, api_login: str) -> None:
     """Добавить подключение к iiko / Add iiko Cloud connection."""
     import uuid
@@ -208,7 +227,9 @@ def list_connections() -> None:
     click.echo(f"{'ID':<10} {'Сервис':<12} {'Имя':<20} {'Обновлено'}")
     click.echo("-" * 60)
     for conn in connections:
-        click.echo(f"{conn['id']:<10} {conn['service']:<12} {conn['name']:<20} {conn['updated_at']}")
+        click.echo(
+            f"{conn['id']:<10} {conn['service']:<12} {conn['name']:<20} {conn['updated_at']}"
+        )
 
 
 @config.command("remove")

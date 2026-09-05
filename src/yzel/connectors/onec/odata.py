@@ -131,7 +131,8 @@ class OneCODataClient:
 
         url = self._build_url(entity, params=params)
         response = await self._request("GET", url)
-        return response.json().get("value", [])
+        result: list[dict[str, Any]] = response.json().get("value", [])
+        return result
 
     async def get_entity(self, entity: str, key: str) -> dict[str, Any] | None:
         """Fetch a single record by GUID key. Returns None if not found."""
@@ -143,7 +144,8 @@ class OneCODataClient:
             return None
         if response.status_code >= 400:
             raise _parse_odata_error(response)
-        return response.json()
+        result: dict[str, Any] | None = response.json()
+        return result
 
     async def count_entities(self, entity: str, filter_expr: str | None = None) -> int:
         """Count records in an entity set via $inlinecount=allpages.
@@ -164,13 +166,15 @@ class OneCODataClient:
         """Create a new record in 1C."""
         url = self._build_url(entity)
         response = await self._request("POST", url, json=data)
-        return response.json()
+        result: dict[str, Any] = response.json()
+        return result
 
     async def update_entity(self, entity: str, key: str, data: dict[str, Any]) -> dict[str, Any]:
         """Update an existing record in 1C (PATCH semantics)."""
         url = self._build_url(entity, key=key)
         response = await self._request("PATCH", url, json=data)
-        return response.json()
+        result: dict[str, Any] = response.json()
+        return result
 
     async def delete_entity(self, entity: str, key: str) -> None:
         """Mark a record for deletion in 1C.

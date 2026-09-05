@@ -121,7 +121,8 @@ class TelegramClient:
 
     async def get_me(self) -> dict[str, Any]:
         """Данные бота / Bot identity."""
-        return await self._call("getMe")
+        result: dict[str, Any] = await self._call("getMe")
+        return result
 
     # --- Sending ---
 
@@ -144,7 +145,8 @@ class TelegramClient:
             params["reply_markup"] = reply_markup
         if disable_web_page_preview is not None:
             params["disable_web_page_preview"] = disable_web_page_preview
-        return await self._call("sendMessage", params)
+        result: dict[str, Any] = await self._call("sendMessage", params)
+        return result
 
     async def send_photo(
         self,
@@ -159,7 +161,8 @@ class TelegramClient:
             params["caption"] = caption
         if parse_mode:
             params["parse_mode"] = parse_mode
-        return await self._call("sendPhoto", params)
+        result: dict[str, Any] = await self._call("sendPhoto", params)
+        return result
 
     async def send_document(
         self,
@@ -174,7 +177,8 @@ class TelegramClient:
             params["caption"] = caption
         if parse_mode:
             params["parse_mode"] = parse_mode
-        return await self._call("sendDocument", params)
+        result: dict[str, Any] = await self._call("sendDocument", params)
+        return result
 
     # --- Editing / deleting outgoing messages ---
 
@@ -189,7 +193,8 @@ class TelegramClient:
         params: dict[str, Any] = {"chat_id": chat_id, "message_id": message_id, "text": text}
         if parse_mode:
             params["parse_mode"] = parse_mode
-        return await self._call("editMessageText", params)
+        result: dict[str, Any] | bool = await self._call("editMessageText", params)
+        return result
 
     async def delete_message(self, chat_id: int | str, message_id: int) -> bool:
         """Удалить сообщение / Delete a message."""
@@ -249,13 +254,15 @@ class TelegramClient:
 
     async def get_webhook_info(self) -> dict[str, Any]:
         """Информация о текущем webhook / Current webhook info."""
-        return await self._call("getWebhookInfo")
+        result: dict[str, Any] = await self._call("getWebhookInfo")
+        return result
 
     # --- Chats ---
 
     async def get_chat(self, chat_id: int | str) -> dict[str, Any]:
         """Данные чата / Chat info."""
-        return await self._call("getChat", {"chat_id": chat_id})
+        result: dict[str, Any] = await self._call("getChat", {"chat_id": chat_id})
+        return result
 
     async def close(self) -> None:
         if self._client and not self._client.is_closed:

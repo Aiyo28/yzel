@@ -96,7 +96,9 @@ async def list_tools() -> list[Tool]:
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Максимальное количество записей (по умолчанию 25, макс 1000)",
+                        "description": (
+                            "Максимальное количество записей (по умолчанию 25, макс 1000)"
+                        ),
                         "default": 25,
                     },
                     "offset": {
@@ -194,7 +196,9 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="moysklad_stock",
-            description="Получить остатки товаров из МойСклад (по всем складам или по каждому складу)",
+            description=(
+                "Получить остатки товаров из МойСклад (по всем складам или по каждому складу)"
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -249,11 +253,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     filter_expr=arguments.get("filter"),
                     search=arguments.get("search"),
                     expand=arguments.get("expand"),
-                    **(
-                        {}
-                        if entity_type != "customerorder"
-                        else {"order": arguments.get("order")}
-                    ),
+                    **({} if entity_type != "customerorder" else {"order": arguments.get("order")}),
                 )
             )
 
@@ -307,5 +307,10 @@ async def main() -> None:
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
 
-if __name__ == "__main__":
+def run() -> None:
+    """Console-script entry point (see [project.scripts]). Sync wrapper for main()."""
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    run()

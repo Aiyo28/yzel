@@ -1,0 +1,25 @@
+{
+  "name": "yzel",
+  "description": "MCP connectors for CIS business tools — 1C:Enterprise, Bitrix24, AmoCRM, MoySklad, Wildberries, Ozon, Telegram, iiko. 68 tools across 8 stdio servers.",
+  "version": "0.1.1",
+  "author": {
+    "name": "Ayal Nogovitsyn"
+  },
+  "homepage": "https://ayal.tech",
+  "repository": "https://github.com/Aiyo28/yzel",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "1c",
+    "bitrix24",
+    "amocrm",
+    "moysklad",
+    "wildberries",
+    "ozon",
+    "telegram",
+    "iiko",
+    "cis",
+    "erp",
+    "crm"
+  ]
+}

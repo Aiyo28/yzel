@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class ServiceType(str, Enum):
+class ServiceType(StrEnum):
     """Supported business tool services."""
 
     ONEC = "1c"
@@ -21,7 +21,7 @@ class ServiceType(str, Enum):
     IIKO = "iiko"
 
 
-class ConnectionStatus(str, Enum):
+class ConnectionStatus(StrEnum):
     """Connection health status."""
 
     CONNECTED = "connected"
@@ -41,7 +41,9 @@ class OneCCredential(ServiceCredential):
     """1C Enterprise credentials — Basic Auth over OData."""
 
     service: ServiceType = ServiceType.ONEC
-    host: str = Field(description="1C OData endpoint URL (e.g., https://server/base/odata/standard.odata)")
+    host: str = Field(
+        description="1C OData endpoint URL (e.g., https://server/base/odata/standard.odata)"
+    )
     username: str
     password: str
     is_fresh: bool = Field(default=False, description="True if 1C:Fresh cloud, false if on-prem")
@@ -73,7 +75,10 @@ class AmoCRMCredential(ServiceCredential):
     redirect_uri: str
     refresh_token_updated_at: float = Field(
         default=0.0,
-        description="Unix timestamp of the last successful refresh_token exchange. 0 = unknown (treat as 'now' for staleness checks).",
+        description=(
+            "Unix timestamp of the last successful refresh_token exchange. "
+            "0 = unknown (treat as 'now' for staleness checks)."
+        ),
     )
 
 
@@ -151,7 +156,9 @@ class WildberriesCredential(ServiceCredential):
     """
 
     service: ServiceType = ServiceType.WILDBERRIES
-    api_key: str = Field(description="JWT token issued in WB seller cabinet (Настройки → Доступ к API)")
+    api_key: str = Field(
+        description="JWT token issued in WB seller cabinet (Настройки → Доступ к API)"
+    )
     is_sandbox: bool = Field(default=False, description="True if token targets WB sandbox hosts")
 
 

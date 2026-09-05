@@ -55,9 +55,7 @@ def _parse_iiko_error(response: httpx.Response) -> IikoError:
     try:
         data = response.json()
     except ValueError:
-        return IikoError(
-            response.status_code, response.text[:200] or response.reason_phrase
-        )
+        return IikoError(response.status_code, response.text[:200] or response.reason_phrase)
     if isinstance(data, dict):
         message = (
             data.get("errorDescription")
@@ -129,7 +127,10 @@ class IikoClient:
             # Token likely invalidated server-side; refresh once and retry
             async with self._refresh_lock:
                 await self._refresh_token()
-                token = self._access_token
+                refreshed = self._access_token
+                if refreshed is None:
+                    raise IikoError(401, "Не удалось обновить токен iiko после 401")
+                token = refreshed
             response = await client.post(
                 url,
                 json=body or {},
@@ -155,9 +156,7 @@ class IikoClient:
         data = await self._post("/api/1/organizations", body)
         return data.get("organizations", []) if isinstance(data, dict) else []
 
-    async def get_terminal_groups(
-        self, organization_ids: list[str]
-    ) -> list[dict[str, Any]]:
+    async def get_terminal_groups(self, organization_ids: list[str]) -> list[dict[str, Any]]:
         """Группы терминалов / Terminal groups per organization."""
         body = {"organizationIds": organization_ids}
         data = await self._post("/api/1/terminal_groups", body)
@@ -167,17 +166,14 @@ class IikoClient:
 
     async def get_nomenclature(self, organization_id: str) -> dict[str, Any]:
         """Меню / Menu nomenclature for a single organization."""
-        return await self._post(
+        result: dict[str, Any] = await self._post(
             "/api/1/nomenclature", {"organizationId": organization_id}
         )
+        return result
 
-    async def get_stop_list(
-        self, organization_ids: list[str]
-    ) -> list[dict[str, Any]]:
+    async def get_stop_list(self, organization_ids: list[str]) -> list[dict[str, Any]]:
         """Стоп-лист (товары, которых нет) / Stop list (out-of-stock items)."""
-        data = await self._post(
-            "/api/1/stop_lists", {"organizationIds": organization_ids}
-        )
+        data = await self._post("/api/1/stop_lists", {"organizationIds": organization_ids})
         return data.get("terminalGroupStopLists", []) if isinstance(data, dict) else []
 
     # --- Deliveries / orders ---
@@ -195,9 +191,7 @@ class IikoClient:
             body["deliveryDateFrom"] = delivery_date_from
         if delivery_date_to is not None:
             body["deliveryDateTo"] = delivery_date_to
-        data = await self._post(
-            "/api/1/deliveries/by_delivery_date_and_phone", body
-        )
+        data = await self._post("/api/1/deliveries/by_delivery_date_and_phone", body)
         return data.get("ordersByOrganizations", []) if isinstance(data, dict) else []
 
     async def create_delivery(
@@ -212,35 +206,26 @@ class IikoClient:
             "terminalGroupId": terminal_group_id,
             "order": order,
         }
-        return await self._post("/api/1/deliveries/create", body)
+        result: dict[str, Any] = await self._post("/api/1/deliveries/create", body)
+        return result
 
     # --- Reference data ---
 
-    async def get_order_types(
-        self, organization_ids: list[str]
-    ) -> list[dict[str, Any]]:
+    async def get_order_types(self, organization_ids: list[str]) -> list[dict[str, Any]]:
         """Типы заказов / Order types (dine-in / takeaway / delivery)."""
         data = await self._post(
             "/api/1/deliveries/order_types", {"organizationIds": organization_ids}
         )
         return data.get("orderTypes", []) if isinstance(data, dict) else []
 
-    async def get_payment_types(
-        self, organization_ids: list[str]
-    ) -> list[dict[str, Any]]:
+    async def get_payment_types(self, organization_ids: list[str]) -> list[dict[str, Any]]:
         """Типы оплаты / Payment types."""
-        data = await self._post(
-            "/api/1/payment_types", {"organizationIds": organization_ids}
-        )
+        data = await self._post("/api/1/payment_types", {"organizationIds": organization_ids})
         return data.get("paymentTypes", []) if isinstance(data, dict) else []
 
-    async def get_employees(
-        self, organization_ids: list[str]
-    ) -> list[dict[str, Any]]:
+    async def get_employees(self, organization_ids: list[str]) -> list[dict[str, Any]]:
         """Сотрудники / Employees per organization."""
-        data = await self._post(
-            "/api/1/employees", {"organizationIds": organization_ids}
-        )
+        data = await self._post("/api/1/employees", {"organizationIds": organization_ids})
         return data.get("employees", []) if isinstance(data, dict) else []
 
     async def close(self) -> None:

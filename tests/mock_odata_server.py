@@ -16,12 +16,8 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import re
-import secrets
-import uuid
 from base64 import b64decode
-from datetime import datetime, timedelta
 
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -229,6 +225,7 @@ METADATA_XML = """<?xml version="1.0" encoding="utf-8"?>
 
 # --- Handlers ---
 
+
 async def root(request: Request) -> Response:
     """OData service root — list available entity sets."""
     if err := _auth_required(request):
@@ -239,10 +236,12 @@ async def root(request: Request) -> Response:
         return Response(METADATA_XML, media_type="application/xml")
 
     entity_sets = [{"name": name, "url": name} for name in ENTITIES]
-    return JSONResponse({
-        "odata.metadata": f"{request.url.scheme}://{request.url.netloc}/odata/standard.odata",
-        "value": entity_sets,
-    })
+    return JSONResponse(
+        {
+            "odata.metadata": f"{request.url.scheme}://{request.url.netloc}/odata/standard.odata",
+            "value": entity_sets,
+        }
+    )
 
 
 async def metadata(request: Request) -> Response:
@@ -261,6 +260,7 @@ async def entity_list(request: Request) -> Response:
 
     # Handle URL-encoded Cyrillic
     from urllib.parse import unquote
+
     raw_entity = unquote(raw_entity)
 
     # Check for single-entity request: Entity(guid'xxxxx')
@@ -270,14 +270,24 @@ async def entity_list(request: Request) -> Response:
         key = guid_match.group(2)
         if entity_name not in ENTITIES:
             return JSONResponse(
-                {"odata.error": {"code": "8", "message": {"lang": "ru", "value": f"Сущность '{entity_name}' не найдена"}}},
+                {
+                    "odata.error": {
+                        "code": "8",
+                        "message": {"lang": "ru", "value": f"Сущность '{entity_name}' не найдена"},
+                    }
+                },
                 status_code=404,
             )
         for item in ENTITIES[entity_name]:
             if item.get("Ref_Key") == key:
                 return JSONResponse(item)
         return JSONResponse(
-            {"odata.error": {"code": "404", "message": {"lang": "ru", "value": "Запись не найдена"}}},
+            {
+                "odata.error": {
+                    "code": "404",
+                    "message": {"lang": "ru", "value": "Запись не найдена"},
+                }
+            },
             status_code=404,
         )
 
@@ -285,7 +295,12 @@ async def entity_list(request: Request) -> Response:
 
     if entity_name not in ENTITIES:
         return JSONResponse(
-            {"odata.error": {"code": "8", "message": {"lang": "ru", "value": f"Сущность '{entity_name}' не найдена"}}},
+            {
+                "odata.error": {
+                    "code": "8",
+                    "message": {"lang": "ru", "value": f"Сущность '{entity_name}' не найдена"},
+                }
+            },
             status_code=404,
         )
 
@@ -329,11 +344,17 @@ async def entity_single(request: Request) -> Response:
     key = request.path_params["key"]
 
     from urllib.parse import unquote
+
     entity_name = unquote(entity_name)
 
     if entity_name not in ENTITIES:
         return JSONResponse(
-            {"odata.error": {"code": "8", "message": {"lang": "ru", "value": f"Сущность '{entity_name}' не найдена"}}},
+            {
+                "odata.error": {
+                    "code": "8",
+                    "message": {"lang": "ru", "value": f"Сущность '{entity_name}' не найдена"},
+                }
+            },
             status_code=404,
         )
 
@@ -377,6 +398,7 @@ app = Starlette(
 
 if __name__ == "__main__":
     import uvicorn
+
     print("🔧 Mock 1C OData Server")
     print("   URL:  http://localhost:8077/odata/standard.odata/")
     print("   Auth: admin / test")

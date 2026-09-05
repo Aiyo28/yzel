@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import httpx
 import pytest
 import uvicorn
-
-from yzel.connectors.amocrm.client import AmoCRMClient, AmoCRMAuthError, AmoCRMError
 
 from tests.mock_amocrm_server import (
     VALID_CLIENT_ID,
@@ -19,6 +17,7 @@ from tests.mock_amocrm_server import (
     app,
     reset_state,
 )
+from yzel.connectors.amocrm.client import AmoCRMAuthError, AmoCRMClient, AmoCRMError
 
 MOCK_PORT = 8180
 MOCK_BASE = f"http://localhost:{MOCK_PORT}"
@@ -107,9 +106,11 @@ async def test_get_lead_by_id(client: AmoCRMClient) -> None:
 
 async def test_create_leads(client: AmoCRMClient) -> None:
     """Create leads (batch)."""
-    result = await client.create_leads([
-        {"name": "Тестовая сделка", "price": 100000},
-    ])
+    result = await client.create_leads(
+        [
+            {"name": "Тестовая сделка", "price": 100000},
+        ]
+    )
     created = result["_embedded"]["leads"]
     assert len(created) == 1
     assert created[0]["id"] >= 100

@@ -1,0 +1,66 @@
+name: Bug report / Ошибка
+description: Something does not work. Что-то не работает.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Пишите по-русски или по-английски — как удобнее. / Russian or English, whichever suits.
+
+        **Если сервер просто не запускается — это самый частый случай, и это наша вина, не ваша.**
+        MCP-клиенты падают молча. Ответьте на первые два вопроса, остальное необязательно.
+
+  - type: dropdown
+    id: connector
+    attributes:
+      label: Коннектор / Connector
+      options: ["1C", "Bitrix24", "AmoCRM", "МойСклад", "Wildberries", "Ozon", "Telegram", "iiko", "yzel CLI", "не знаю / not sure"]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: stage
+    attributes:
+      label: На каком шаге / Where it broke
+      options:
+        - "Установка / Install (pip, uvx)"
+        - "yzel config add-… (добавление credentials)"
+        - "Сервер не стартует в MCP-клиенте / Server does not start in the MCP client"
+        - "Сервер стартует, но инструмент возвращает ошибку / Tool returns an error"
+        - "Данные приходят, но неправильные / Wrong data comes back"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: Что произошло / What happened
+      description: Текст ошибки целиком, если есть. Уберите токены и пароли. / Full error text if any — strip tokens and passwords.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия / Version
+      description: "`yzel --version`"
+      placeholder: "0.1.1"
+
+  - type: input
+    id: client
+    attributes:
+      label: MCP-клиент / MCP client
+      placeholder: "Claude Desktop 1.x / Claude Code / Cursor / …"
+
+  - type: input
+    id: edition
+    attributes:
+      label: Редакция сервиса / Service edition
+      description: Для 1С — Fresh или on-prem, конфигурация. Для остальных — тариф, если важно.
+      placeholder: "1С:Fresh, Бухгалтерия предприятия"
+
+  - type: input
+    id: os
+    attributes:
+      label: ОС и Python / OS and Python
+      placeholder: "Windows 11, Python 3.12"

@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import httpx
 import pytest
 import uvicorn
 
-from yzel.connectors.telegram.client import RateLimiter, TelegramClient, TelegramError
 from tests.mock_telegram_server import VALID_TOKEN, app
+from yzel.connectors.telegram.client import RateLimiter, TelegramClient, TelegramError
 
 MOCK_PORT = 8182
 MOCK_URL = f"http://127.0.0.1:{MOCK_PORT}"
@@ -86,9 +86,7 @@ async def test_edit_missing_message_raises(client: TelegramClient) -> None:
 
 
 async def test_send_photo(client: TelegramClient) -> None:
-    res = await client.send_photo(
-        chat_id=555, photo="https://example.com/cat.jpg", caption="Кот"
-    )
+    res = await client.send_photo(chat_id=555, photo="https://example.com/cat.jpg", caption="Кот")
     assert res["caption"] == "Кот"
 
 

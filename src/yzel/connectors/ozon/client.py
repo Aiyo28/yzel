@@ -127,7 +127,8 @@ class OzonClient:
             "limit": limit,
             "last_id": last_id,
         }
-        return (await self._post("/v3/product/list", body)).get("result", {})
+        result: dict[str, Any] = (await self._post("/v3/product/list", body)).get("result", {})
+        return result
 
     async def get_product_info(
         self,
@@ -164,9 +165,7 @@ class OzonClient:
 
     # --- FBS postings (orders) ---
 
-    async def list_unfulfilled_postings(
-        self, limit: int = 100, offset: int = 0
-    ) -> dict[str, Any]:
+    async def list_unfulfilled_postings(self, limit: int = 100, offset: int = 0) -> dict[str, Any]:
         """Неотгруженные сборочные задания FBS / Unfulfilled FBS postings."""
         body = {
             "dir": "ASC",
@@ -175,7 +174,10 @@ class OzonClient:
             "offset": offset,
             "with": {"analytics_data": False, "financial_data": False},
         }
-        return (await self._post("/v3/posting/fbs/unfulfilled/list", body)).get("result", {})
+        result: dict[str, Any] = (await self._post("/v3/posting/fbs/unfulfilled/list", body)).get(
+            "result", {}
+        )
+        return result
 
     async def list_postings(
         self,
@@ -193,7 +195,8 @@ class OzonClient:
             "offset": offset,
             "with": {"analytics_data": False, "financial_data": False},
         }
-        return (await self._post("/v3/posting/fbs/list", body)).get("result", {})
+        result: dict[str, Any] = (await self._post("/v3/posting/fbs/list", body)).get("result", {})
+        return result
 
     async def get_posting(self, posting_number: str) -> dict[str, Any]:
         """Получить сборочное задание по номеру."""

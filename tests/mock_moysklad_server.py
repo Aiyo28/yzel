@@ -16,7 +16,6 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import uuid
 from typing import Any
 
@@ -173,18 +172,38 @@ CUSTOMER_ORDERS = [
 ]
 
 STOCK_ALL = [
-    {"name": "Бумага А4 офисная", "code": "BUM-A4-500", "stock": 150, "reserve": 20, "inTransit": 0, "quantity": 150},
-    {"name": "Дизельное топливо ДТ-Л", "code": "DT-L-001", "stock": 5000, "reserve": 0, "inTransit": 200, "quantity": 5000},
+    {
+        "name": "Бумага А4 офисная",
+        "code": "BUM-A4-500",
+        "stock": 150,
+        "reserve": 20,
+        "inTransit": 0,
+        "quantity": 150,
+    },
+    {
+        "name": "Дизельное топливо ДТ-Л",
+        "code": "DT-L-001",
+        "stock": 5000,
+        "reserve": 0,
+        "inTransit": 200,
+        "quantity": 5000,
+    },
 ]
 
 STOCK_BYSTORE = [
-    {"name": "Бумага А4 офисная", "stockByStore": [
-        {"store": {"name": "Основной склад"}, "stock": 100, "reserve": 20},
-        {"store": {"name": "Склад №2"}, "stock": 50, "reserve": 0},
-    ]},
-    {"name": "Дизельное топливо ДТ-Л", "stockByStore": [
-        {"store": {"name": "ГСМ Склад"}, "stock": 5000, "reserve": 0},
-    ]},
+    {
+        "name": "Бумага А4 офисная",
+        "stockByStore": [
+            {"store": {"name": "Основной склад"}, "stock": 100, "reserve": 20},
+            {"store": {"name": "Склад №2"}, "stock": 50, "reserve": 0},
+        ],
+    },
+    {
+        "name": "Дизельное топливо ДТ-Л",
+        "stockByStore": [
+            {"store": {"name": "ГСМ Склад"}, "stock": 5000, "reserve": 0},
+        ],
+    },
 ]
 
 # Entity registries
@@ -221,6 +240,7 @@ def _expand_nested(item: dict[str, Any], expand_fields: list[str]) -> dict[str, 
 
 
 # --- Handlers ---
+
 
 async def entity_list(request: Request) -> Response:
     if err := _check_auth(request):
@@ -262,10 +282,18 @@ async def entity_list(request: Request) -> Response:
         expand_fields = expand.split(",")
         items = [_expand_nested(i, expand_fields) for i in items]
 
-    return JSONResponse({
-        "meta": {"href": str(request.url), "type": entity_type, "size": total, "limit": limit, "offset": offset},
-        "rows": items,
-    })
+    return JSONResponse(
+        {
+            "meta": {
+                "href": str(request.url),
+                "type": entity_type,
+                "size": total,
+                "limit": limit,
+                "offset": offset,
+            },
+            "rows": items,
+        }
+    )
 
 
 async def entity_get(request: Request) -> Response:
@@ -346,19 +374,23 @@ async def entity_update(request: Request) -> Response:
 async def stock_all(request: Request) -> Response:
     if err := _check_auth(request):
         return err
-    return JSONResponse({
-        "meta": {"href": str(request.url), "size": len(STOCK_ALL)},
-        "rows": STOCK_ALL,
-    })
+    return JSONResponse(
+        {
+            "meta": {"href": str(request.url), "size": len(STOCK_ALL)},
+            "rows": STOCK_ALL,
+        }
+    )
 
 
 async def stock_bystore(request: Request) -> Response:
     if err := _check_auth(request):
         return err
-    return JSONResponse({
-        "meta": {"href": str(request.url), "size": len(STOCK_BYSTORE)},
-        "rows": STOCK_BYSTORE,
-    })
+    return JSONResponse(
+        {
+            "meta": {"href": str(request.url), "size": len(STOCK_BYSTORE)},
+            "rows": STOCK_BYSTORE,
+        }
+    )
 
 
 # --- App ---

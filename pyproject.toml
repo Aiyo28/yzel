@@ -1,6 +1,6 @@
 [project]
 name = "yzel"
-version = "0.1.0"
+version = "0.1.1"
 description = "Unified MCP connectors for CIS business tools — 1C, Bitrix24, AmoCRM, Moysklad"
 readme = "README.md"
 license = "MIT"
@@ -38,6 +38,17 @@ dev = [
 
 [project.scripts]
 yzel = "yzel.cli:main"
+# One console script per connector. Each is a standalone stdio MCP server, so an
+# MCP client config can call it directly (`uvx --from yzel yzel-1c`) without a
+# working directory, a clone, or a `python -m` invocation.
+yzel-1c = "yzel.connectors.onec.server:run"
+yzel-bitrix24 = "yzel.connectors.bitrix24.server:run"
+yzel-amocrm = "yzel.connectors.amocrm.server:run"
+yzel-moysklad = "yzel.connectors.moysklad.server:run"
+yzel-wildberries = "yzel.connectors.wildberries.server:run"
+yzel-ozon = "yzel.connectors.ozon.server:run"
+yzel-telegram = "yzel.connectors.telegram.server:run"
+yzel-iiko = "yzel.connectors.iiko.server:run"
 
 [project.urls]
 Homepage = "https://github.com/Aiyo28/yzel"
@@ -59,6 +70,12 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+# Mock servers reproduce real vendor payloads (1C OData $metadata XML, Ozon banners).
+# Re-wrapping them would make the fixtures diverge from what the services actually send,
+# which is the one property that makes a mock worth having.
+"tests/mock_*_server.py" = ["E501"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
@@ -66,3 +83,12 @@ asyncio_mode = "auto"
 [tool.mypy]
 python_version = "3.11"
 strict = true
+
+[[tool.mypy.overrides]]
+# The MCP SDK ships `@server.list_tools()` / `@server.call_tool()` without type
+# annotations, so --strict flags every handler that uses them. Nothing here is
+# fixable in this codebase. Scoping the relaxation to the server modules keeps
+# strict mode enforced across the clients, the vault and schema discovery.
+module = "yzel.connectors.*.server"
+disallow_untyped_decorators = false
+disallow_untyped_calls = false

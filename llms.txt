@@ -1,0 +1,99 @@
+# Yzel
+
+> MCP connectors for CIS business tools: 1C:Enterprise, Bitrix24, AmoCRM, МойСклад, Wildberries,
+> Ozon, Telegram, iiko. Eight stdio MCP servers in one Python package. Version 0.1.1, MIT.
+
+This file is written for AI coding assistants. It is enough to install, configure and drive Yzel
+without reading the source. Do not invent tool names that are not listed here — the server
+returns "Неизвестный инструмент" for anything unrecognised.
+
+## What this is
+
+A Python package exposing eight independent MCP servers, one per business system. Each runs over
+stdio. Credentials are held locally, AES-256-GCM encrypted, in `~/.yzel/store.db`; the key is
+`$YZEL_KEY` or a generated `~/.yzel/vault.key`. Nothing is sent anywhere but the configured
+service. Requires Python 3.11+. Works on Windows without WSL.
+
+## Install and wire up
+
+No install needed — `uvx` fetches on demand, and this form does not depend on a working directory:
+
+```json
+{
+  "mcpServers": {
+    "yzel-1c": { "command": "uvx", "args": ["--from", "yzel", "yzel-1c"] }
+  }
+}
+```
+
+Or `pip install yzel` / `uv tool install yzel`.
+
+**Credentials must be added before a server will start.** The MCP server reads them from the
+vault; there is no interactive prompt over stdio.
+
+| System | Console script | Credential command |
+|---|---|---|
+| 1C:Enterprise | `yzel-1c` | `yzel config add-1c` (`--fresh` for 1C:Fresh cloud) |
+| Bitrix24 | `yzel-bitrix24` | `yzel config add-bitrix` |
+| AmoCRM | `yzel-amocrm` | `yzel config add-amocrm` |
+| МойСклад | `yzel-moysklad` | `yzel config add-moysklad` |
+| Wildberries | `yzel-wildberries` | `yzel config add-wildberries [--sandbox]` |
+| Ozon | `yzel-ozon` | `yzel config add-ozon [--sandbox]` |
+| Telegram | `yzel-telegram` | `yzel config add-telegram` |
+| iiko | `yzel-iiko` | `yzel config add-iiko` |
+
+`yzel config list` shows configured connections; `yzel config remove <id>` deletes one.
+
+## Tools — 68 total, 47 read-only, 21 mutating
+
+**1C (8)** — `onec_list_entities` `onec_schema` `onec_query` `onec_get` `onec_count` ·
+mutating: `onec_create` `onec_update` `onec_delete`
+
+**Ozon (11)** — `ozon_list_products` `ozon_product_info` `ozon_list_warehouses`
+`ozon_list_postings` `ozon_get_posting` `ozon_unfulfilled` `ozon_get_stocks` `ozon_analytics`
+`ozon_transactions` · mutating: `ozon_update_prices` `ozon_update_stocks`
+
+**Wildberries (10)** — `wb_seller_info` `wb_list_cards` `wb_list_warehouses` `wb_get_orders`
+`wb_new_orders` `wb_order_stats` `wb_sales` `wb_get_prices` `wb_get_stocks` ·
+mutating: `wb_update_stocks`
+
+**Telegram (12)** — `tg_get_me` `tg_get_chat` `tg_get_updates` `tg_get_webhook_info` ·
+mutating: `tg_send_message` `tg_send_photo` `tg_send_document` `tg_edit_message`
+`tg_delete_message` `tg_set_webhook` `tg_delete_webhook` `tg_answer_callback`
+
+**iiko (9)** — `iiko_organizations` `iiko_terminal_groups` `iiko_nomenclature` `iiko_stop_list`
+`iiko_order_types` `iiko_payment_types` `iiko_employees` `iiko_deliveries_by_phone` ·
+mutating: `iiko_create_delivery`
+
+**AmoCRM (6)** — `amocrm_account` `amocrm_pipelines` `amocrm_list` `amocrm_get` ·
+mutating: `amocrm_create` `amocrm_update`
+
+**Bitrix24 (6)** — `bitrix24_crm_list` `bitrix24_crm_get` `bitrix24_tasks_list`
+`bitrix24_task_get` · mutating: `bitrix24_crm_create` `bitrix24_crm_update`
+
+**МойСклад (6)** — `moysklad_organizations` `moysklad_list` `moysklad_get` `moysklad_stock` ·
+mutating: `moysklad_create` `moysklad_update`
+
+## Rules that matter
+
+- **The 21 mutating tools act on production business systems.** `ozon_update_prices` changes
+  live prices; `tg_set_webhook` silently takes over a bot's updates. Confirm with the user before
+  calling any of them, and never call one to "test" a connection.
+- **1C: start with `onec_schema`.** Entity names are Cyrillic and come from the infobase, not
+  from a fixed list. An empty schema raises `EmptySchemaError` — it means the infobase has no
+  OData-published objects, not that the connection failed. See `docs/TROUBLESHOOTING-1C.md`.
+- **Wildberries and Ozon have sandbox modes.** Prefer them for anything that writes.
+- Errors come back as readable Russian text (`Ошибка 1С: …`), not exceptions.
+
+## Not supported
+
+WhatsApp, goszakup.gov.kz, Zoom/Meet/Telemost are on the roadmap and do not exist. There is no
+hosted or remote transport — stdio only. There is no telemetry.
+
+## Docs
+
+- `README.md` — full setup, bilingual RU/EN
+- `docs/ARCHITECTURE.md` — internals
+- `docs/TROUBLESHOOTING-1C.md` — OData publication, `EmptySchemaError`, permissions
+- `docs/TESTING.md` — what the 138 tests cover and what they cannot
+- `docs/LIVE-CHECKS.md` — live verification protocol, read-only vs mutating

@@ -13,14 +13,14 @@ Covers:
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import httpx
 import pytest
 import uvicorn
 
-from yzel.connectors.onec.odata import OneCError, OneCODataClient
 from tests.mock_odata_server import app
+from yzel.connectors.onec.odata import OneCError, OneCODataClient
 
 MOCK_PORT = 8078
 MOCK_URL = f"http://127.0.0.1:{MOCK_PORT}/odata/standard.odata"
@@ -126,9 +126,7 @@ async def test_filter_by_boolean(client: OneCODataClient) -> None:
 
 
 async def test_get_entity_by_guid(client: OneCODataClient) -> None:
-    record = await client.get_entity(
-        "Catalog_Контрагенты", "b1c2d3e4-f5a6-7890-abcd-ef1234567890"
-    )
+    record = await client.get_entity("Catalog_Контрагенты", "b1c2d3e4-f5a6-7890-abcd-ef1234567890")
     assert record is not None
     assert record["Description"] == "ООО Рога и Копыта"
     assert record["ИНН"] == "7701234567"
