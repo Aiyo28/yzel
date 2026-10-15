@@ -8,7 +8,7 @@
 are going unreported — most likely silent MCP-server startup failures, which no client surfaces
 well. A three-line issue saying "1C, Fresh, server never starts" is worth more than a patch.
 
-The second most useful: an [API drift report](.github/ISSUE_TEMPLATE/api_drift.yml). Our 138
+The second most useful: an [API drift report](.github/ISSUE_TEMPLATE/api_drift.yml). Our
 tests run against mock servers written in this repo, so they are structurally incapable of
 noticing that Ozon or Wildberries changed a response shape. Only a real tenant sees that.
 
@@ -18,7 +18,7 @@ noticing that Ozon or Wildberries changed a response shape. Only a real tenant s
 git clone https://github.com/Aiyo28/yzel.git
 cd yzel
 uv sync --extra dev      # `--extra dev` is required — a bare `uv run pytest` cannot import yzel
-uv run pytest -q         # expect: 138 passed
+uv run pytest -q         # expect: all tests pass
 ```
 
 Python 3.11+. Windows works without WSL.

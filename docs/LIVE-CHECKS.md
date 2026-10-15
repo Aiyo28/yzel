@@ -1,6 +1,6 @@
 # Live checks — the repeatable protocol
 
-Companion to `docs/TESTING.md`. That document explains why the 138 unit tests cannot catch API
+Companion to `docs/TESTING.md`. That document explains why the unit tests cannot catch API
 drift; this one is the thing you actually re-run.
 
 **Cadence: before every release, and quarterly regardless.** Vendors change seller APIs without
@@ -108,7 +108,7 @@ One row per connector per run. `R` = read probes, `W` = write probes. Status: `p
 
 | Date | Connector | R | W | Version | Finding |
 |---|---|---|---|---|---|
-| 2026-09-05 | — | — | — | v0.1.0 | Protocol written. No live run yet — every connector is `blocked` until a tenant is available. L1 suite verified: 138 passed. |
+| 2026-09-05 | — | — | — | v0.1.0 | Protocol written. No live run yet — every connector is `blocked` until a tenant is available. L1 suite verified: all passed. |
 
 ## What a failure obliges
 

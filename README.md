@@ -68,7 +68,7 @@ pip install yzel        # или: uv tool install yzel
 git clone https://github.com/Aiyo28/yzel.git
 cd yzel
 uv sync --extra dev
-uv run pytest           # 138 тестов / 138 tests
+uv run pytest           # все тесты / all tests
 ```
 
 ---
@@ -213,7 +213,7 @@ uv run python -m yzel.connectors.iiko.server
 - **Basic Auth без токен-сессий.** В 1С нет refresh-потока — каждый запрос отправляет base64(user:pass). Yzel не изобретает несуществующую token-refresh логику.
 - **Без BSL-расширений.** Yzel подключается к опубликованным OData/HTTP API. Никаких модификаций конфигурации 1С не требуется.
 
-Тестирование: 138 unit-тестов против mock-серверов. Транспорт + `$metadata` parsing подтверждены на живом 1С:Fresh endpoint. Полное data-plane тестирование против реального 1С требует инфобазы с опубликованными через OData объектами (on-prem или платный Fresh-тенант с правами администратора) — см. [`docs/TROUBLESHOOTING-1C.md`](docs/TROUBLESHOOTING-1C.md) если получаете `EmptySchemaError`.
+Тестирование: unit-тесты против mock-серверов. Транспорт + `$metadata` parsing подтверждены на живом 1С:Fresh endpoint. Полное data-plane тестирование против реального 1С требует инфобазы с опубликованными через OData объектами (on-prem или платный Fresh-тенант с правами администратора) — см. [`docs/TROUBLESHOOTING-1C.md`](docs/TROUBLESHOOTING-1C.md) если получаете `EmptySchemaError`.
 
 ---
 
@@ -233,7 +233,7 @@ git clone https://github.com/aiyo28/yzel.git
 cd yzel
 uv sync
 
-# Запустить все тесты (137)
+# Запустить все тесты
 uv run pytest
 
 # Только один коннектор

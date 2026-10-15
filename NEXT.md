@@ -1,6 +1,6 @@
 # NEXT
 
-Tactical queue. Reasoning and the full spec live in `docs/DISTRIBUTION.md`.
+Tactical queue. Design decisions live in `docs/adr/`; terms in `docs/GLOSSARY.md`.
 
 **Read the State table before the Queue.** These are separated on purpose: the previous version
 of this file was a queue that described finished work as pending, and four releases went past it
@@ -17,12 +17,6 @@ in one afternoon without it noticing.
 | Quality | 143 tests, 0 ruff findings, 0 mypy findings |
 | Version drift | `tests/test_versions.py` asserts pyproject == `__version__` == `server.json` == `plugin.json` == `llms.txt`, and that `mcp` stays `<2` |
 | Plugin | `.claude-plugin/plugin.json` + `.mcp.json` exist; **not listed in any marketplace yet** |
-
-**Traffic baseline** — 14 days to 2026-09-05, captured *before* any of the above was live:
-85 views / 28 unique, **37 clones / 23 unique cloners**, arriving from Google (10 uniq), Yandex
-and ChatGPT. **Zero issues filed.** GitHub retains only 14 days, so this line is the baseline;
-`docs/DISTRIBUTION.md` holds the reasoning. Re-pull traffic in a fortnight — clones should fall
-as PyPI downloads rise, and that delta is the conversion signal.
 
 ## Queue
 
@@ -50,15 +44,14 @@ reporting 0.1.0 while the package shipped 0.1.2.
 
 ### 3. Close the feedback loop
 
-23 unique cloners, zero issues. The channel exists (3 issue templates, `CONTRIBUTING.md`,
-Discussions on, 13 topics); nobody has been pointed at it.
+The channel exists (3 issue templates, `CONTRIBUTING.md`, Discussions on, 13 topics); nobody has
+been pointed at it.
 
 - [ ] Seed Discussions with 2-3 real questions — `EmptySchemaError`, OData publication,
       Windows-without-WSL setup.
 - [ ] Triage protocol: an API-drift report fixes the client **and** its
       `tests/mock_*_server.py`, then pins the corrected shape with a test. Skipping the mock
       re-opens the same gap next quarter.
-- [ ] Show HN post — never actually made. Check before assuming a thread exists to reply to.
 
 ### 4. Live verification — BLOCKED on tenant access, not on effort
 
@@ -66,17 +59,13 @@ Discussions on, 13 topics); nobody has been pointed at it.
 Wildberries and Ozon; 21 of 68 tools mutate production state.
 
 - ⛔ **The 1C Бухгалтерия smoke test is BLOCKED.** `[I]`#78: 1C:Fresh *trial* tenants
-  structurally block the OData data plane — confirmed on `msk1.1cfresh.com/a/sbm_demo/4001896/`,
-  where `/$metadata` returns HTTP 200 with only system `ComplexType`s and **zero** `EntityType`s.
+  structurally block the OData data plane — `/$metadata` returns HTTP 200 with only system
+  `ComplexType`s and **zero** `EntityType`s.
   Publication needs Configurator or tenant-admin rights that trials do not grant. This needs an
   on-prem infobase or a paid Fresh tenant — an acquisition task. It sat as an open checkbox from
   2026-04-24 to 2026-09-05 because it was filed as pending rather than blocked.
-- Owner is asking ODAS for read-only access to a live 1С:Бухгалтерия (2026-09-05). Parked until
-  that lands.
 
 ### 5. Connector roadmap — `ROADMAP.md`
-
-Deliberately last: none of it helps the cloners who arrive today.
 
 - v0.2 — WhatsApp via `wacli` sidecar · goszakup.gov.kz read-only · AmoCRM OAuth browser flow
 - v0.3 — meetings tier, research first (Zoom / Meet / Teams / Telemost / VK / Контур.Толк / SberJazz)
@@ -110,6 +99,3 @@ fails at import against it. Lifting the pin means migrating `@server.list_tools(
   other than what a user gets.** Tests ran against `uv.lock`, not a fresh resolve. The install
   check confirmed the process started, not that it spoke the protocol. `--version` was asserted
   nowhere. CI now covers the first two; queue item 2 covers the third.
-- Strategic context is vault-side: `Projects/yzel/_context.md` + `_insights.md`. ⚠ Both are stale
-  on two points — they record the credential path as `~/.yzel/vault.db` (it is `store.db`) and
-  the install as from-source only.

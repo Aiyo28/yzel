@@ -20,14 +20,7 @@ graph TD
 
 ## Glossary (Ubiquitous Language)
 
-Extends `docs/DISTRIBUTION.md` § glossary, which owns **Plugin**, **Registry entry** and **Console script**. Note that doc already bans "listing" as an alias for Registry entry.
-
-| Term | Definition | Aliases to avoid |
-|------|------------|------------------|
-| **Directory entry** | The Plugin as published in Anthropic's Claude directory after portal review. Distinct from the Registry entry (MCP Registry). | "listing", "marketplace", "store page" |
-| **Pinned launcher** | An `.mcp.json` server entry whose `uvx` argument names an exact version (`yzel==X.Y.Z`). | "locked", "frozen" |
-| **Portal Validate** | The Validate button at claude.ai/directory/manage. Runs more checks than `claude plugin validate`. | "lint", "CI check" |
-| **Reviewer hold** | A version waiting for an Anthropic reviewer before it can go live. Not a rejection. | "rejected", "blocked" |
+Terms used here — **Plugin**, **Registry entry**, **Console script**, **Directory entry**, **Pinned launcher**, **Portal Validate**, **Reviewer hold** — are defined in `docs/GLOSSARY.md`.
 
 ## User Stories
 
@@ -41,7 +34,7 @@ Extends `docs/DISTRIBUTION.md` § glossary, which owns **Plugin**, **Registry en
 
 - **Pinned launchers:** all 8 `.mcp.json` entries move from `--from yzel` to `--from yzel==<version>`. The source of truth stays `pyproject.toml`, the same rule `tests/test_versions.py` already enforces for `server.json`, `plugin.json`, `llms.txt` and `__init__`.
 - **Version-sync test:** extend `tests/test_versions.py`, the existing file, with one parametrized test. Every `uvx --from yzel…` occurrence in `.mcp.json`, `README.md` and `llms.txt` must read `yzel==<pyproject version>`, and an unpinned `--from yzel ` anywhere fails. This keeps `pyproject.toml` as the single source of truth, as the file's docstring already requires.
-- **One pinned form everywhere (unified):** every place that tells someone how to launch a connector uses the same pinned form `uvx --from yzel==<version> yzel-<connector>`. That covers the 8 plugin `.mcp.json` entries, the README Claude Desktop snippets and the per-connector line (README ~L56, L111–126), `llms.txt`, `docs/DISTRIBUTION.md` (its module table and layering rule still show `uvx --from yzel …`), and the RELEASE_NOTES template. `server.json` already pins through its `version` field. This reverses the earlier "README stays unpinned" choice: one form means a user copying from the README runs exactly what the directory reviewed, and there is no second syntax to explain. Trade-off accepted: a new release now also bumps the README, and the version test catches any miss.
+- **One pinned form everywhere (unified):** every place that tells someone how to launch a connector uses the same pinned form `uvx --from yzel==<version> yzel-<connector>`. That covers the 8 plugin `.mcp.json` entries, the README Claude Desktop snippets and the per-connector line (README ~L56, L111–126), `llms.txt`, and the RELEASE_NOTES template. `server.json` already pins through its `version` field. This reverses the earlier "README stays unpinned" choice: one form means a user copying from the README runs exactly what the directory reviewed, and there is no second syntax to explain. Trade-off accepted: a new release now also bumps the README, and the version test catches any miss.
 - **Root `CLAUDE.md` stays.** It is the maintainer's operator letter for coding agents, not plugin context, so the validator warning is accepted, not fixed.
 - **Credentials unchanged.** The local AES vault remains. The checklist's *userConfig `sensitive: true`* rule targets credentials written into plugin files, and Yzel writes none. Migrating is out of scope (see Out of Scope).
 - **Release:** the pin change needs a published version whose PyPI artifact matches. Either cut 0.1.4 (pins included) or pin 0.1.3, which is already on PyPI. **Recommended: pin 0.1.3.** Code is unchanged, so no new PyPI release is needed.

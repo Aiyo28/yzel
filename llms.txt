@@ -93,7 +93,8 @@ hosted or remote transport — stdio only. There is no telemetry.
 ## Docs
 
 - `README.md` — full setup, bilingual RU/EN
-- `docs/ARCHITECTURE.md` — internals
+- `docs/adr/` — design decisions (stack, non-goals, distribution, launch form)
+- `docs/GLOSSARY.md` — the project's terms
 - `docs/TROUBLESHOOTING-1C.md` — OData publication, `EmptySchemaError`, permissions
-- `docs/TESTING.md` — what the 138 tests cover and what they cannot
+- `docs/TESTING.md` — what the unit tests cover and what they cannot
 - `docs/LIVE-CHECKS.md` — live verification protocol, read-only vs mutating
