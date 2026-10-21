@@ -1,68 +1,81 @@
-# Yzel (Узел) — Agent Protocol
+# Yzel (Узел) — Operator Letter
 
-## Context
+You are working on Yzel with me. Here is the headspace.
 
-Not-for-profit OSS MCP connector portfolio for CIS business tools (1C, Bitrix24, AmoCRM, Moysklad, Wildberries, Ozon, Telegram, iiko — plus WhatsApp-via-wacli, goszakup, meetings platforms on the roadmap). MIT end-to-end. No paid tier, no closed cloud layer. Publish-and-help positioning.
+## What this is, in one breath
 
-| Component | Stack | Constraints |
-|-----------|-------|-------------|
-| MCP Servers | Python 3.11+, mcp SDK, uv | Must run on Windows without WSL |
-| Connectors | OData v3 (1C), REST (most), Playwright/scrape (goszakup if no token) | MIT license everywhere |
-| Sidecars | WhatsApp via `wacli` subprocess per tenant | Reference: github.com/steipete/wacli |
+Yzel is the OSS MCP connector portfolio I'm building for the CIS business
+stack — 1C, Bitrix24, AmoCRM, Moysklad, Wildberries, Ozon, Telegram, iiko,
+and more coming (WhatsApp via wacli, goszakup, meetings platforms). Every
+line MIT. No paid tier. No closed cloud. The point is to publish useful
+code and help people who are stuck integrating these systems on Windows
+boxes in Almaty and Almaty-adjacent offices that don't have WSL and don't
+want it.
 
-## Session Protocol
+## Who I am here
 
-1. **Start:** Read `ROADMAP.md` for shipped scope + active workstreams
-2. **Architecture:** `docs/ARCHITECTURE.md`
-3. **End:** Update `ROADMAP.md` if you change scope
+I'm a solo founder running this as the reputation lane next to my revenue
+projects. Yzel does not need to make money. It needs to be the thing people
+find when they search "1C MCP" or "Bitrix24 MCP." Engagement that doesn't
+ship code is noise. If you find yourself adding pricing pages, sales funnels,
+or "Pro tier" hints — stop and ask me. That's not what this is.
 
-## Where to Find Things
+## What you should believe about the domain
 
-| Topic | Location |
-|-------|----------|
-| Architecture | `docs/ARCHITECTURE.md` |
-| Public roadmap | `ROADMAP.md` |
-| User-facing docs | `README.md` |
-| Per-connector design notes | `docs/ARCHITECTURE.md` → "Per-connector design notes" section |
+- **1C is not Salesforce.** Its OData is XML by default, Cyrillic by default,
+  and the schema changes per client deployment. There is no canonical
+  "Products" table — there's `Справочник_Номенклатура` and it's different
+  in every install. Assume nothing. Discover everything via `$metadata`.
+- **Russian is primary.** The user is reading the README in Russian. English
+  is the courtesy translation. Error messages, CLI help, docs — Russian first.
+- **Windows without WSL.** Half our target users can't run WSL. If your code
+  needs Linux primitives, it doesn't work for them, which means it doesn't
+  exist.
 
-## Rules
+## How we work together
 
-- **MIT everywhere.** Every file under `src/` is MIT. No closed server engine. If a feature needs a closed component, it doesn't belong in Yzel.
-- **Not-for-profit framing.** README, docs, CLI help, issue templates: good-faith OSS language. No pricing, no sales funnel. EN + RU.
-- **Never require changes to client's 1C configuration.** Connect via published OData/HTTP APIs only. No BSL extensions, no config modifications.
-- **Cyrillic field names stay Cyrillic.** 1C OData returns Cyrillic object names (`Справочник_Номенклатура`). Do not transliterate — preserve as-is in code and API responses.
-- **Always request `?$format=json` for 1C.** OData defaults to XML. Every 1C request must include the format parameter.
-- **RU-first docs.** README, CLI help, error messages: Russian primary, English secondary.
-- **Dynamic schema, never hardcode.** 1C installations have different configs. Always discover available objects via `$metadata` at runtime.
+- When you don't know which connector this change belongs in, ask. Don't
+  guess and refactor.
+- When you want to add a closed dependency to make life easier — don't.
+  Find the open alternative or skip the feature.
+- When you read a 1C field name and want to "fix" the Cyrillic — leave it.
+  That's not a typo, that's the schema.
+- If a rule below feels wrong for the change you're making, push back. Tell
+  me. Don't silently work around it.
 
-## Critical Gotchas
+## Glossary
 
-1. **1C OData uses Cyrillic URL segments** — `Catalog_Номенклатура` not `Catalog_Products`. URL-encode Cyrillic in requests. Test with real Cyrillic paths, not mocks.
-2. **1C Basic Auth has no token — it's per-request.** Every HTTP call sends base64(user:pass). There is no session token to cache or refresh. Don't build token refresh logic for 1C.
-3. **AmoCRM refresh tokens expire after 3 months of inactivity.** If background refresh stops (server down, job killed), the token silently dies. Must monitor refresh health, not just access token expiry.
-4. **Bitrix24 rate limit is 2 req/sec (leaky bucket).** Exceeding returns 429 with no retry-after header. Implement client-side rate limiting, don't rely on server response.
-5. **1C `$metadata` can be enormous** (10MB+ for complex ERP configs). Parse streaming, never load full XML into memory. Cache discovered schema with TTL.
-6. **Moysklad nested entities require explicit `expand` parameter.** Without it, you get UUIDs instead of objects. Always expand in list queries or users get useless IDs.
-7. **1C:Fresh OData endpoint format differs from on-prem:** `1cfresh.com/a/<config>/<id>/odata/` vs `<host>/<base>/odata/`. The connector must detect deployment type.
+- **Connector** — one MCP server, one upstream system. Lives in
+  `src/yzel/connectors/<name>/`.
+- **Sidecar** — external subprocess a connector launches (e.g. wacli for
+  WhatsApp). Per-tenant, not per-connector.
+- **Tenant** — one end-user's credentials + their 1C/Bitrix instance.
+- **You** — the agent making the change.
+- **I / me / we** — the human running Yzel.
+- **Users** — third parties who install Yzel and connect their own systems.
 
-## Build & Run
+---
 
-```bash
-# Install
-uv sync
+# Critical Gotchas
 
-# Run individual connector
-uv run python -m yzel.connectors.onec.server
-uv run python -m yzel.connectors.bitrix24.server
-uv run python -m yzel.connectors.wildberries.server
-uv run python -m yzel.connectors.ozon.server
-uv run python -m yzel.connectors.telegram.server
-uv run python -m yzel.connectors.iiko.server
+These come from real incidents. Each one cost me hours the first time.
 
-# Test
-uv run pytest
-uv run pytest tests/test_onec.py -k "test_schema_discovery"
-
-# Build package
-uv build
-```
+1. **1C OData URL segments are Cyrillic, URL-encoded.** `Catalog_Номенклатура`
+   not `Catalog_Products`. Test with real Cyrillic paths, not mocks.
+2. **1C Basic Auth has no session token.** Every request sends
+   `base64(user:pass)`. Don't build token refresh logic for 1C — there's
+   nothing to refresh.
+3. **AmoCRM refresh tokens die silently after 3 months of inactivity.**
+   Monitor refresh health, not access-token expiry.
+4. **Bitrix24 rate limit is 2 req/sec, leaky bucket, no `Retry-After` header.**
+   Rate-limit client-side. Don't trust the server to tell you.
+5. **1C `$metadata` can be 10MB+.** Stream-parse, never load the full XML.
+   Cache discovered schema with TTL.
+6. **Moysklad: always `expand` nested entities.** Without it you get UUIDs
+   instead of objects, and the user gets garbage.
+7. **1C:Fresh ≠ on-prem URL format.** `1cfresh.com/a/<config>/<id>/odata/`
+   vs `<host>/<base>/odata/`. Detect deployment type, don't assume.
+8. **Every 1C request needs `?$format=json`.** Default is XML. Forget once
+   and you're parsing XML by hand for an hour.
+9. **MIT everywhere under `src/`.** If a feature needs a closed component,
+   it doesn't belong in Yzel.
