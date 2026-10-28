@@ -10,6 +10,8 @@
 [![CI](https://github.com/Aiyo28/yzel/actions/workflows/ci.yml/badge.svg)](https://github.com/Aiyo28/yzel/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/yzel.svg)](https://pypi.org/project/yzel/)
 
+[![Yzel — 1C:Enterprise MCP server](https://mcprush.com/badge/yzel-1c-enterprise-mcp/card.svg)](https://mcprush.com/to/yzel-1c-enterprise-mcp?ref=badge)
+
 <!-- mcp-name: io.github.Aiyo28/yzel -->
 
 Yzel подключает Claude, ChatGPT и других AI-ассистентов к 1С:Предприятию, Битрикс24, AmoCRM, МойСкладу, Wildberries, Ozon, Telegram и iiko — через [Model Context Protocol](https://modelcontextprotocol.io).
