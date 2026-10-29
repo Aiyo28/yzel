@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <b>MCP-коннекторы для бизнес-инструментов СНГ.</b> Первый серьёзный MCP-сервер для 1С — плюс 7 других систем в одном пакете.<br>
-  <b>MCP connectors for CIS business tools.</b> The first serious MCP server for 1C:Enterprise — plus 7 other CIS business systems in a single package.
+  <b>Подключите AI-ассистента к 1С, Wildberries и Ozon.</b> Открытый хобби-проект на MCP.<br>
+  <b>Connect your AI assistant to 1C, Wildberries and Ozon.</b> An open-source MCP hobby project.
 </p>
 
 <p align="center">
@@ -24,17 +24,19 @@
 
 Yzel подключает Claude, ChatGPT и других AI-ассистентов к 1С:Предприятию, Битрикс24, AmoCRM, МойСкладу, Wildberries, Ozon, Telegram и iiko — через [Model Context Protocol](https://modelcontextprotocol.io).
 
-**Открытый проект. MIT. Без платных тарифов, без закрытых модулей, без облачной SaaS-надстройки.** Yzel существует чтобы бизнес СНГ мог подключать свои рабочие инструменты к AI без 60 000 ₽ за кастомную интеграцию.
+**Открытый проект. MIT. Без платных тарифов, без закрытых модулей, без облачной SaaS-надстройки.**
 
 ---
 
-## Почему Yzel / Why Yzel
+## Откуда это / How it started
 
-**1С — причина, по которой это существует.** Из 10+ MCP-серверов для 1С, которые можно найти на GitHub, ни один не решает базовые проблемы рабочего использования: динамическая дискавери схемы через `$metadata`, корректная работа с кириллическими именами объектов (`Catalog_Контрагенты` не `Catalog_Counterparties`), авто-определение on-prem vs 1С:Fresh, streaming-парсинг `$metadata` для больших ERP-конфигураций. Yzel делает это как базовый функционал, а не TODO в README.
+**Откуда это.** Друг попросил подключить Claude к своей 1С, а мне хотелось следить за Wildberries через AI. Решил сделать и то, и другое, а заодно добавил сервисы, которыми пользуются вокруг: Ozon, МойСклад, Битрикс24, AmoCRM, Telegram, iiko. Это хобби-проект: делаю в свободное время, бесплатно, под MIT.
 
-Для остальных инструментов — Bitrix24, AmoCRM, МойСклад и т.д. — MCP-серверы существуют в разных качествах у разных авторов. Yzel собирает их в один пакет с общим credential vault, едиными паттернами ошибок и единым CLI. Ставится одной командой.
+**Что умеет коннектор для 1С.** Сам находит объекты вашей конфигурации через `$metadata`, оставляет кириллические имена как есть (`Catalog_Контрагенты`), различает on-prem и 1С:Fresh и справляется с большими ERP-конфигурациями.
 
-**Why the portfolio exists:** fragmented MCP landscape. Eight connectors × eight setup paths × eight security models × eight bug trackers = nobody ships. Yzel bundles them with a shared vault, unified error handling, and one CLI.
+Все восемь коннекторов ставятся одним пакетом, с общим хранилищем ключей и одним CLI.
+
+**How it started.** A friend asked me to connect Claude to their 1C, and I wanted AI to keep an eye on Wildberries. So I built both, then added the other services people around me use. It's a hobby project: built in spare time, free, MIT.
 
 ---
 
