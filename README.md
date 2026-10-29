@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/banner.jpg" alt="Yzel (Узел) — четыре кабеля, связанные в один узел" width="100%">
+  <img src="https://raw.githubusercontent.com/Aiyo28/yzel/master/docs/assets/banner.jpg" alt="Yzel (Узел) — четыре кабеля, связанные в один узел" width="100%">
 </p>
 
 <p align="center">
