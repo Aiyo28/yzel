@@ -17,7 +17,7 @@
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-compatible-green.svg" alt="MCP Compatible"></a>
   <a href="https://github.com/Aiyo28/yzel/actions/workflows/ci.yml"><img src="https://github.com/Aiyo28/yzel/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://pypi.org/project/yzel/"><img src="https://img.shields.io/pypi/v/yzel.svg" alt="PyPI"></a>
-  <a href="https://mcprush.com/to/yzel-1c-enterprise-mcp?ref=badge"><img src="https://mcprush.com/badge/yzel-1c-enterprise-mcp/badge.svg" alt="mcprush"></a>
+  <a href="https://mcprush.com/to/yzel-1c-enterprise-mcp?ref=badge"><img src="https://img.shields.io/badge/mcprush-listed-1f1f1f.svg" alt="mcprush"></a>
 </p>
 
 <!-- mcp-name: io.github.Aiyo28/yzel -->
