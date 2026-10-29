@@ -6,23 +6,21 @@ Tactical queue. Reasoning and the full spec live in `docs/DISTRIBUTION.md`.
 of this file was a queue that described finished work as pending, and four releases went past it
 in one afternoon without it noticing.
 
-## State — verified 2026-09-05
+## State — verified 2026-10-29
 
 | | |
 |---|---|
-| PyPI | `yzel 0.1.3` · `Requires-Dist: mcp<2.0.0,>=1.0.0` |
-| MCP Registry | `io.github.Aiyo28/yzel` v0.1.3, `isLatest: true`, pypi + uvx |
-| Install | `uvx --from yzel yzel-<connector>` — all 8 complete an MCP `initialize` handshake reporting `v0.1.3` |
-| CI | tests on 3.11/3.12/3.13 · ruff · ruff format · mypy `--strict` · build · `installed` (wheel, no lockfile) · weekly cron |
-| Quality | 143 tests, 0 ruff findings, 0 mypy findings |
-| Version drift | `tests/test_versions.py` asserts pyproject == `__version__` == `server.json` == `plugin.json` == `llms.txt`, and that `mcp` stays `<2` |
+| PyPI | `yzel 0.1.4` · `Requires-Dist: mcp<2.0.0,>=1.0.0` |
+| MCP Registry | `io.github.Aiyo28/yzel` v0.1.4, `isLatest: true`, pypi + uvx |
+| Install | `uvx --from yzel yzel-<connector>`; clean-dir handshake reports `yzel-1c 0.1.4` |
+| Desktop Extension | `yzel-1c-0.1.4.mcpb` on GitHub release v0.1.4; ran end to end from a clean env against the mock 1C. **Install dialog in Claude Desktop not yet tried.** |
+| CI | tests on 3.11/3.12/3.13 · ruff · ruff format · mypy `--strict` · build · `installed` · weekly cron |
+| Quality | 147 tests, 0 ruff findings, 0 mypy findings |
 | Plugin | `.claude-plugin/plugin.json` + `.mcp.json` exist; **not listed in any marketplace yet** |
 
-**Traffic baseline** — 14 days to 2026-09-05, captured *before* any of the above was live:
-85 views / 28 unique, **37 clones / 23 unique cloners**, arriving from Google (10 uniq), Yandex
-and ChatGPT. **Zero issues filed.** GitHub retains only 14 days, so this line is the baseline;
-`docs/DISTRIBUTION.md` holds the reasoning. Re-pull traffic in a fortnight — clones should fall
-as PyPI downloads rise, and that delta is the conversion signal.
+**Traffic** — 14 days to 2026-10-29: 15 unique visitors, **76 unique cloners**, 5 stars, **0 issues**.
+PyPI (pypistats, no mirrors): 28/week, 255/month; 285 of the 634 total are launch-day self-traffic.
+Re-pull 2026-11-12: the `.mcpb` should move people from cloning to installing.
 
 ## Queue
 
