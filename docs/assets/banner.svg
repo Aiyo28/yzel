@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" width="1280" height="400" role="img" aria-label="Yzel (Узел) — MCP-коннекторы для 1С и бизнес-инструментов СНГ">
+  <rect width="1280" height="400" rx="16" fill="#0E1116"/>
+  <g font-family="-apple-system, 'Segoe UI', Inter, Roboto, 'Helvetica Neue', Arial, sans-serif">
+    <text x="72" y="168" fill="#F3F4F6" font-size="84" font-weight="700" letter-spacing="-1.5">Yzel <tspan fill="#F2C94C">Узел</tspan></text>
+    <text x="74" y="226" fill="#E5E7EB" font-size="25" font-weight="500">MCP-коннекторы для 1С и бизнес-инструментов СНГ</text>
+    <text x="74" y="264" fill="#9CA3AF" font-size="21">MCP connectors for 1C:Enterprise and CIS business tools</text>
+    <text x="74" y="330" fill="#6B7280" font-size="17" letter-spacing="0.4">MIT · open source · Claude · ChatGPT · Cursor</text>
+    <g stroke="#2B3240" stroke-width="2"><line x1="1015" y1="200" x2="1015.0" y2="72.0"/><line x1="1015" y1="200" x2="1147.9" y2="120.2"/><line x1="1015" y1="200" x2="1180.7" y2="228.5"/><line x1="1015" y1="200" x2="1088.7" y2="315.3"/><line x1="1015" y1="200" x2="941.3" y2="315.3"/><line x1="1015" y1="200" x2="849.3" y2="228.5"/><line x1="1015" y1="200" x2="882.1" y2="120.2"/></g>
+    <g fill="#161B23" stroke="#3A4354" stroke-width="1.5"><rect x="965.6" y="55.0" width="98.8" height="34" rx="17"/><rect x="1108.1" y="103.2" width="79.6" height="34" rx="17"/><rect x="1131.3" y="211.5" width="98.8" height="34" rx="17"/><rect x="1024.9" y="298.3" width="127.6" height="34" rx="17"/><rect x="911.1" y="298.3" width="60.4" height="34" rx="17"/><rect x="799.9" y="211.5" width="98.8" height="34" rx="17"/><rect x="851.9" y="103.2" width="60.4" height="34" rx="17"/></g>
+    <g fill="#D1D5DB" font-size="16" font-weight="500" text-anchor="middle"><text x="1015.0" y="77.5">Bitrix24</text><text x="1147.9" y="125.7">AmoCRM</text><text x="1180.7" y="234.0">МойСклад</text><text x="1088.7" y="320.8">Wildberries</text><text x="941.3" y="320.8">Ozon</text><text x="849.3" y="234.0">Telegram</text><text x="882.1" y="125.7">iiko</text></g>
+    <circle cx="1015" cy="200" r="52" fill="#F2C94C"/>
+    <text x="1015" y="212" fill="#0E1116" font-size="34" font-weight="700" text-anchor="middle">1С</text>
+  </g>
+</svg>

@@ -192,3 +192,37 @@ def test_detect_deployment_on_prem() -> None:
     from yzel.connectors.onec.odata import detect_deployment
 
     assert detect_deployment("https://erp.mycompany.ru/base/odata/standard.odata") == "on-prem"
+
+
+# --- Credentials from the environment (Claude Desktop extension path) ---
+
+
+def test_env_credential_used_when_url_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The .mcpb settings form passes credentials as env vars; no vault, no CLI step."""
+    from yzel.connectors.onec.server import _credential_from_env
+
+    monkeypatch.setenv("YZEL_1C_URL", "https://1cfresh.com/a/ea/123/odata/standard.odata")
+    monkeypatch.setenv("YZEL_1C_USERNAME", "Администратор")
+    monkeypatch.setenv("YZEL_1C_PASSWORD", "")  # 1C users often have no password
+
+    cred = _credential_from_env()
+    assert cred is not None
+    assert cred.username == "Администратор"
+    assert cred.password == ""
+    assert cred.is_fresh is True
+
+
+def test_env_credential_absent_falls_back_to_vault(monkeypatch: pytest.MonkeyPatch) -> None:
+    from yzel.connectors.onec.server import _credential_from_env
+
+    monkeypatch.delenv("YZEL_1C_URL", raising=False)
+    assert _credential_from_env() is None
+
+
+def test_env_credential_without_username_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    from yzel.connectors.onec.server import _credential_from_env
+
+    monkeypatch.setenv("YZEL_1C_URL", "https://server/base/odata/standard.odata")
+    monkeypatch.delenv("YZEL_1C_USERNAME", raising=False)
+    with pytest.raises(RuntimeError, match="YZEL_1C_USERNAME"):
+        _credential_from_env()

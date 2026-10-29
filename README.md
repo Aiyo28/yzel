@@ -1,16 +1,24 @@
-# Yzel (Узел)
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="Yzel (Узел) — MCP-коннекторы для 1С и бизнес-инструментов СНГ" width="100%">
+</p>
 
-> **MCP-коннекторы для бизнес-инструментов СНГ.** Первый серьёзный MCP-сервер для 1С — плюс 7 других систем в одном пакете.
->
-> **MCP connectors for CIS business tools.** The first serious MCP server for 1C:Enterprise — plus 7 other CIS business systems in a single package.
+<p align="center">
+  <b>MCP-коннекторы для бизнес-инструментов СНГ.</b> Первый серьёзный MCP-сервер для 1С — плюс 7 других систем в одном пакете.<br>
+  <b>MCP connectors for CIS business tools.</b> The first serious MCP server for 1C:Enterprise — plus 7 other CIS business systems in a single package.
+</p>
 
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
-[![MCP Compatible](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io)
-[![CI](https://github.com/Aiyo28/yzel/actions/workflows/ci.yml/badge.svg)](https://github.com/Aiyo28/yzel/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/yzel.svg)](https://pypi.org/project/yzel/)
+<p align="center">
+  <a href="https://github.com/Aiyo28/yzel/releases/latest"><b>⬇ Установить в Claude Desktop / Install in Claude Desktop</b></a>
+</p>
 
-[![Yzel — 1C:Enterprise MCP server](https://mcprush.com/badge/yzel-1c-enterprise-mcp/card.svg)](https://mcprush.com/to/yzel-1c-enterprise-mcp?ref=badge)
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+"></a>
+  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-compatible-green.svg" alt="MCP Compatible"></a>
+  <a href="https://github.com/Aiyo28/yzel/actions/workflows/ci.yml"><img src="https://github.com/Aiyo28/yzel/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pypi.org/project/yzel/"><img src="https://img.shields.io/pypi/v/yzel.svg" alt="PyPI"></a>
+  <a href="https://mcprush.com/to/yzel-1c-enterprise-mcp?ref=badge"><img src="https://mcprush.com/badge/yzel-1c-enterprise-mcp/badge.svg" alt="mcprush"></a>
+</p>
 
 <!-- mcp-name: io.github.Aiyo28/yzel -->
 
@@ -49,6 +57,20 @@ Yzel подключает Claude, ChatGPT и других AI-ассистент�
 
 ## Установка / Install
 
+### Claude Desktop — в один клик / one click (1С)
+
+1. Скачайте `yzel-1c-<версия>.mcpb` со страницы [последнего релиза](https://github.com/Aiyo28/yzel/releases/latest) / Download the `.mcpb` from the latest release.
+2. Откройте файл двойным щелчком — Claude Desktop покажет окно установки / Double-click it; Claude Desktop opens an install dialog.
+3. Введите адрес OData, пользователя и пароль 1С / Enter the OData URL, 1C user and password.
+
+Python и зависимости Claude Desktop ставит сам; терминал не нужен. Пароль хранится в настройках
+Claude Desktop и уходит только на ваш сервер 1С. Остальные коннекторы пока ставятся через `uvx`
+(ниже). / Claude Desktop installs Python and dependencies itself — no terminal. The password stays
+in Claude Desktop's settings and is sent only to your 1C server. Other connectors install via `uvx`
+below for now.
+
+### Через uvx / pip — все коннекторы / all connectors
+
 Требуется Python 3.11+. Работает на Windows без WSL / Python 3.11+, works on Windows without WSL.
 
 **Ничего не устанавливать / Nothing to install** — рекомендуется. `uvx` скачивает и запускает
@@ -70,7 +92,7 @@ pip install yzel        # или: uv tool install yzel
 git clone https://github.com/Aiyo28/yzel.git
 cd yzel
 uv sync --extra dev
-uv run pytest           # 138 тестов / 138 tests
+uv run pytest           # 146 тестов / 146 tests
 ```
 
 ---
@@ -102,6 +124,10 @@ yzel config list
 ```
 
 Учётные данные хранятся зашифрованными (AES-256) в локальном SQLite-vault под `~/.yzel/store.db`. Ничего не отправляется в облако.
+
+Для 1С вместо vault можно задать переменные окружения — они имеют приоритет / For 1C, env vars
+can replace the vault and take precedence: `YZEL_1C_URL`, `YZEL_1C_USERNAME`, `YZEL_1C_PASSWORD`
+(пароль может быть пустым / the password may be empty).
 
 ### 2. Подключите к Claude Desktop / Wire into Claude Desktop
 
@@ -215,7 +241,7 @@ uv run python -m yzel.connectors.iiko.server
 - **Basic Auth без токен-сессий.** В 1С нет refresh-потока — каждый запрос отправляет base64(user:pass). Yzel не изобретает несуществующую token-refresh логику.
 - **Без BSL-расширений.** Yzel подключается к опубликованным OData/HTTP API. Никаких модификаций конфигурации 1С не требуется.
 
-Тестирование: 138 unit-тестов против mock-серверов. Транспорт + `$metadata` parsing подтверждены на живом 1С:Fresh endpoint. Полное data-plane тестирование против реального 1С требует инфобазы с опубликованными через OData объектами (on-prem или платный Fresh-тенант с правами администратора) — см. [`docs/TROUBLESHOOTING-1C.md`](docs/TROUBLESHOOTING-1C.md) если получаете `EmptySchemaError`.
+Тестирование: 146 unit-тестов против mock-серверов. Транспорт + `$metadata` parsing подтверждены на живом 1С:Fresh endpoint. Полное data-plane тестирование против реального 1С требует инфобазы с опубликованными через OData объектами (on-prem или платный Fresh-тенант с правами администратора) — см. [`docs/TROUBLESHOOTING-1C.md`](docs/TROUBLESHOOTING-1C.md) если получаете `EmptySchemaError`.
 
 ---
 

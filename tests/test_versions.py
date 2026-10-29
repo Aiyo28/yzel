@@ -61,3 +61,12 @@ def test_mcp_is_upper_bounded() -> None:
     assert "<2" in mcp.replace(" ", ""), (
         f"mcp must stay upper-bounded until the 2.x port lands; found {mcp!r}"
     )
+
+
+def test_mcpb_manifests_match(declared_version: str) -> None:
+    """Each Desktop Extension bundles this source, so it must carry this version."""
+    manifests = sorted((ROOT / "extensions").glob("*/manifest.json"))
+    assert manifests, "no extensions/*/manifest.json found"
+    for path in manifests:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        assert doc["version"] == declared_version, path

@@ -24,6 +24,7 @@ Not-for-profit OSS MCP connector portfolio for CIS business tools (1C, Bitrix24,
 | Public roadmap | `ROADMAP.md` |
 | User-facing docs | `README.md` |
 | Per-connector design notes | `docs/ARCHITECTURE.md` → "Per-connector design notes" section |
+| Claude Desktop Extensions | `extensions/<connector>/` (manifest + entry); build with `uv run python scripts/build_mcpb.py` |
 
 ## Rules
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.4] — 2026-10-29
+
+### Added
+- **1C as a Claude Desktop Extension** (`extensions/1c/`, built by `scripts/build_mcpb.py`
+  into `dist/yzel-1c-<version>.mcpb`). Uses the mcpb `uv` runtime: Claude Desktop installs
+  Python and dependencies itself, and a settings form collects the OData URL, user and
+  password. No terminal, no `claude_desktop_config.json` editing — the two steps most of the
+  people cloning this repo are not set up for.
+- **1C credentials from environment variables.** `YZEL_1C_URL`, `YZEL_1C_USERNAME`,
+  `YZEL_1C_PASSWORD` take precedence over the vault. This is how the extension's form reaches
+  the server. An empty password is accepted, since many 1C users have none.
+- README banner and an install-in-Claude-Desktop entry at the top.
+
 ## [0.1.3] — 2026-09-05
 
 ### Fixed

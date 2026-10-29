@@ -1,0 +1,71 @@
+{
+  "manifest_version": "0.4",
+  "name": "yzel-1c",
+  "display_name": "Yzel — 1С:Предприятие",
+  "version": "0.1.4",
+  "description": "Подключите Claude к 1С:Предприятию через OData — справочники, документы, регистры. On-prem и 1С:Fresh.",
+  "long_description": "Yzel (Узел) connects Claude to 1C:Enterprise over the standard OData v3 interface. It discovers your configuration's objects at runtime from `$metadata`, keeps Cyrillic names as they are (`Catalog_Контрагенты`), and detects 1C:Fresh vs on-prem automatically. No changes to your 1C configuration are needed: publish OData in the configurator and enter its URL.\n\nCredentials stay on your machine and are sent only to your 1C server. Open source, MIT.",
+  "author": {
+    "name": "Ayal Nogovitsyn",
+    "url": "https://github.com/Aiyo28"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Aiyo28/yzel"
+  },
+  "homepage": "https://github.com/Aiyo28/yzel",
+  "documentation": "https://github.com/Aiyo28/yzel/blob/master/docs/TROUBLESHOOTING-1C.md",
+  "support": "https://github.com/Aiyo28/yzel/issues",
+  "icon": "icon.png",
+  "server": {
+    "type": "uv",
+    "entry_point": "server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": ["run", "--directory", "${__dirname}", "server.py"],
+      "env": {
+        "YZEL_1C_URL": "${user_config.onec_url}",
+        "YZEL_1C_USERNAME": "${user_config.onec_username}",
+        "YZEL_1C_PASSWORD": "${user_config.onec_password}"
+      }
+    }
+  },
+  "tools": [
+    { "name": "onec_list_entities", "description": "Показать доступные объекты 1С (справочники, документы, регистры)" },
+    { "name": "onec_query", "description": "Запросить записи объекта с $filter, $select и $top" },
+    { "name": "onec_get", "description": "Получить одну запись по GUID" },
+    { "name": "onec_schema", "description": "Показать поля объекта" },
+    { "name": "onec_count", "description": "Подсчитать записи объекта" },
+    { "name": "onec_create", "description": "Создать запись" },
+    { "name": "onec_update", "description": "Обновить запись (PATCH)" },
+    { "name": "onec_delete", "description": "Пометить запись на удаление (DeletionMark)" }
+  ],
+  "user_config": {
+    "onec_url": {
+      "type": "string",
+      "title": "Адрес OData / OData URL",
+      "description": "Например https://server/base/odata/standard.odata или https://1cfresh.com/a/ea/<id>/odata/standard.odata",
+      "required": true
+    },
+    "onec_username": {
+      "type": "string",
+      "title": "Пользователь 1С / 1C user",
+      "description": "Пользователь 1С с правами на опубликованные через OData объекты",
+      "required": true
+    },
+    "onec_password": {
+      "type": "string",
+      "title": "Пароль / Password",
+      "description": "Оставьте пустым, если у пользователя нет пароля",
+      "sensitive": true,
+      "required": false,
+      "default": ""
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": { "python": ">=3.11" }
+  },
+  "keywords": ["1c", "1с", "odata", "erp", "accounting", "cis", "mcp"],
+  "license": "MIT"
+}

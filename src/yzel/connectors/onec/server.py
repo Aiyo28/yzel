@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from typing import Any
 
 from mcp.server import Server
@@ -19,7 +20,7 @@ from yzel.core.discovery import discover_schema
 from yzel.core.types import OneCCredential, SchemaEntity
 from yzel.core.vault import CredentialVault
 
-from .odata import OneCError, OneCODataClient
+from .odata import OneCError, OneCODataClient, detect_deployment
 
 server = Server("yzel-1c", version=__version__)
 
@@ -29,11 +30,31 @@ _schema: list[SchemaEntity] = []
 _connection_id: str | None = None
 
 
-async def _ensure_client() -> OneCODataClient:
-    global _client, _schema, _connection_id
+def _credential_from_env() -> OneCCredential | None:
+    """Read a 1C connection from YZEL_1C_URL / _USERNAME / _PASSWORD, or None if unset.
 
-    if _client is not None:
-        return _client
+    This is how the Claude Desktop extension (.mcpb) passes its settings form. When set,
+    it takes precedence over the vault. An empty password is valid — many 1C users have none.
+    """
+    url = os.environ.get("YZEL_1C_URL")
+    if not url:
+        return None
+
+    username = os.environ.get("YZEL_1C_USERNAME")
+    if not username:
+        raise RuntimeError("Задан YZEL_1C_URL, но не задан YZEL_1C_USERNAME")
+
+    return OneCCredential(
+        name="env",
+        host=url,
+        username=username,
+        password=os.environ.get("YZEL_1C_PASSWORD", ""),
+        is_fresh=detect_deployment(url) == "fresh",
+    )
+
+
+def _credential_from_vault() -> OneCCredential:
+    global _connection_id
 
     vault = CredentialVault()
     connections = vault.list_connections()
@@ -47,6 +68,16 @@ async def _ensure_client() -> OneCODataClient:
 
     if not isinstance(cred, OneCCredential):
         raise RuntimeError(f"Неверный тип учётных данных для {_connection_id}")
+    return cred
+
+
+async def _ensure_client() -> OneCODataClient:
+    global _client, _schema
+
+    if _client is not None:
+        return _client
+
+    cred = _credential_from_env() or _credential_from_vault()
 
     _client = OneCODataClient(cred.host, cred.username, cred.password)
     _schema = await discover_schema(cred.host, cred.username, cred.password)
