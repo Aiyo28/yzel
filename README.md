@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/banner.svg" alt="Yzel (Узел) — MCP-коннекторы для 1С и бизнес-инструментов СНГ" width="100%">
+  <img src="docs/assets/banner.jpg" alt="Yzel (Узел) — четыре кабеля, связанные в один узел" width="100%">
 </p>
 
 <p align="center">
