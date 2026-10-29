@@ -67,3 +67,21 @@ uv run pytest tests/test_onec.py -k "test_schema_discovery"
 # Build package
 uv build
 ```
+
+## Release
+
+The maintainer runs these; publish commands are blocked for agents. Order matters: the registry
+checks the PyPI description for `mcp-name`, so PyPI goes first.
+
+```bash
+uv build && uv run python scripts/build_mcpb.py
+uv publish dist/yzel-X.Y.Z-py3-none-any.whl dist/yzel-X.Y.Z.tar.gz
+gh release create vX.Y.Z --notes-file <notes> dist/yzel-1c-X.Y.Z.mcpb
+mcp-publisher login github && mcp-publisher publish
+```
+
+**`uv publish` asks for a "password" — it is not your PyPI password.** Username: `__token__`.
+Password: an API token from pypi.org → Account settings → API tokens → Add API token, scope
+**Project: yzel**. The token is the long string starting `pypi-`, shown once on creation. The
+"Unique identifier" (a UUID) on the token list is only its ID and gets 403. Paste the `pypi-`
+string at the prompt; nothing echoes. Never put it in chat or a file.
