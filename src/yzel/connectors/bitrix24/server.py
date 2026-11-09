@@ -12,9 +12,11 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
+from yzel.core.outcome import error_result
+from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import Bitrix24Credential
 from yzel.core.vault import CredentialVault
 
@@ -90,154 +92,163 @@ _CRM_ENTITIES = {
 }
 
 
+TOOLS: list[Tool] = [
+    make_tool(
+        name="bitrix24_crm_list",
+        description=(
+            "Получить список CRM-сущностей из Bitrix24 (лиды, контакты, сделки, компании). "
+            "Поддерживает фильтрацию, сортировку и выбор полей."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "entity": {
+                    "type": "string",
+                    "enum": ["lead", "contact", "deal", "company"],
+                    "description": "Тип сущности CRM",
+                },
+                "select": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Поля для выборки (например, ['ID', 'TITLE', 'STATUS_ID'])",
+                },
+                "filter": {
+                    "type": "object",
+                    "description": (
+                        "Фильтр в формате Bitrix24 "
+                        "(например, {'>DATE_CREATE': '2026-01-01', 'STATUS_ID': 'NEW'})"
+                    ),
+                },
+                "order": {
+                    "type": "object",
+                    "description": "Сортировка (например, {'DATE_CREATE': 'DESC'})",
+                },
+                "start": {
+                    "type": "integer",
+                    "description": "Смещение для пагинации (по умолчанию 0)",
+                    "default": 0,
+                },
+            },
+            "required": ["entity"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="bitrix24_crm_get",
+        description="Получить одну CRM-сущность из Bitrix24 по ID",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "entity": {
+                    "type": "string",
+                    "enum": ["lead", "contact", "deal", "company"],
+                    "description": "Тип сущности CRM",
+                },
+                "id": {
+                    "type": "integer",
+                    "description": "ID записи",
+                },
+            },
+            "required": ["entity", "id"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="bitrix24_crm_create",
+        description="Создать CRM-сущность в Bitrix24 (лид, контакт, сделку или компанию)",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "entity": {
+                    "type": "string",
+                    "enum": ["lead", "contact", "deal", "company"],
+                    "description": "Тип сущности CRM",
+                },
+                "fields": {
+                    "type": "object",
+                    "description": (
+                        "Поля для создания (например, {'TITLE': 'Новый лид', 'NAME': 'Иван'})"
+                    ),
+                },
+            },
+            "required": ["entity", "fields"],
+        },
+        kind=ToolKind.CREATE,
+    ),
+    make_tool(
+        name="bitrix24_crm_update",
+        description="Обновить CRM-сущность в Bitrix24",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "entity": {
+                    "type": "string",
+                    "enum": ["lead", "contact", "deal", "company"],
+                    "description": "Тип сущности CRM",
+                },
+                "id": {
+                    "type": "integer",
+                    "description": "ID записи",
+                },
+                "fields": {
+                    "type": "object",
+                    "description": "Поля для обновления",
+                },
+            },
+            "required": ["entity", "id", "fields"],
+        },
+        kind=ToolKind.UPDATE,
+    ),
+    make_tool(
+        name="bitrix24_tasks_list",
+        description="Получить список задач из Bitrix24",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "select": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Поля для выборки",
+                },
+                "filter": {
+                    "type": "object",
+                    "description": "Фильтр задач",
+                },
+                "order": {
+                    "type": "object",
+                    "description": "Сортировка",
+                },
+                "start": {
+                    "type": "integer",
+                    "description": "Смещение для пагинации",
+                    "default": 0,
+                },
+            },
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="bitrix24_task_get",
+        description="Получить задачу из Bitrix24 по ID",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "description": "ID задачи",
+                },
+            },
+            "required": ["id"],
+        },
+        kind=ToolKind.READ,
+    ),
+]
+
+
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    """List available Bitrix24 tools."""
-    return [
-        Tool(
-            name="bitrix24_crm_list",
-            description=(
-                "Получить список CRM-сущностей из Bitrix24 (лиды, контакты, сделки, компании). "
-                "Поддерживает фильтрацию, сортировку и выбор полей."
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {
-                        "type": "string",
-                        "enum": ["lead", "contact", "deal", "company"],
-                        "description": "Тип сущности CRM",
-                    },
-                    "select": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Поля для выборки (например, ['ID', 'TITLE', 'STATUS_ID'])",
-                    },
-                    "filter": {
-                        "type": "object",
-                        "description": (
-                            "Фильтр в формате Bitrix24 "
-                            "(например, {'>DATE_CREATE': '2026-01-01', 'STATUS_ID': 'NEW'})"
-                        ),
-                    },
-                    "order": {
-                        "type": "object",
-                        "description": "Сортировка (например, {'DATE_CREATE': 'DESC'})",
-                    },
-                    "start": {
-                        "type": "integer",
-                        "description": "Смещение для пагинации (по умолчанию 0)",
-                        "default": 0,
-                    },
-                },
-                "required": ["entity"],
-            },
-        ),
-        Tool(
-            name="bitrix24_crm_get",
-            description="Получить одну CRM-сущность из Bitrix24 по ID",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {
-                        "type": "string",
-                        "enum": ["lead", "contact", "deal", "company"],
-                        "description": "Тип сущности CRM",
-                    },
-                    "id": {
-                        "type": "integer",
-                        "description": "ID записи",
-                    },
-                },
-                "required": ["entity", "id"],
-            },
-        ),
-        Tool(
-            name="bitrix24_crm_create",
-            description="Создать CRM-сущность в Bitrix24 (лид, контакт, сделку или компанию)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {
-                        "type": "string",
-                        "enum": ["lead", "contact", "deal", "company"],
-                        "description": "Тип сущности CRM",
-                    },
-                    "fields": {
-                        "type": "object",
-                        "description": (
-                            "Поля для создания (например, {'TITLE': 'Новый лид', 'NAME': 'Иван'})"
-                        ),
-                    },
-                },
-                "required": ["entity", "fields"],
-            },
-        ),
-        Tool(
-            name="bitrix24_crm_update",
-            description="Обновить CRM-сущность в Bitrix24",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {
-                        "type": "string",
-                        "enum": ["lead", "contact", "deal", "company"],
-                        "description": "Тип сущности CRM",
-                    },
-                    "id": {
-                        "type": "integer",
-                        "description": "ID записи",
-                    },
-                    "fields": {
-                        "type": "object",
-                        "description": "Поля для обновления",
-                    },
-                },
-                "required": ["entity", "id", "fields"],
-            },
-        ),
-        Tool(
-            name="bitrix24_tasks_list",
-            description="Получить список задач из Bitrix24",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "select": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Поля для выборки",
-                    },
-                    "filter": {
-                        "type": "object",
-                        "description": "Фильтр задач",
-                    },
-                    "order": {
-                        "type": "object",
-                        "description": "Сортировка",
-                    },
-                    "start": {
-                        "type": "integer",
-                        "description": "Смещение для пагинации",
-                        "default": 0,
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="bitrix24_task_get",
-            description="Получить задачу из Bitrix24 по ID",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "ID задачи",
-                    },
-                },
-                "required": ["id"],
-            },
-        ),
-    ]
+    """List available Bitrix24 tools (only the read ones in read-only mode)."""
+    return visible_tools(TOOLS)
 
 
 def _as_text(payload: Any) -> list[TextContent]:
@@ -245,8 +256,11 @@ def _as_text(payload: Any) -> list[TextContent]:
 
 
 @server.call_tool()
-async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] | CallToolResult:
     """Handle tool calls."""
+    # First, before any client or credential is touched: hiding tools in list_tools is not enough.
+    if (refused := refuse_if_read_only(TOOLS, name)) is not None:
+        return refused
     try:
         client = await _ensure_client()
 
@@ -297,7 +311,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
 
     except Bitrix24Error as exc:
-        return [TextContent(type="text", text=f"Ошибка Bitrix24: {exc.description}")]
+        return error_result(f"Ошибка Bitrix24: {exc.description}")
 
 
 async def main() -> None:

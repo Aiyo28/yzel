@@ -1,71 +1,26 @@
 """Every tool declares what it does to the data, and read-only mode enforces it.
 
 Checked at the MCP boundary (`tools/list`, `tools/call`) over an in-memory session, so the
-test survives however a server builds its tools. To cover another server, append one entry
-to `SERVERS`.
+test survives however a server builds its tools. Per-connector wiring lives in
+`connector_cases.py`.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
-from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
+import pkgutil
 from pathlib import Path
 from typing import Any
 
 import pytest
-from mcp import ClientSession
-from mcp.server import Server
-from mcp.shared.memory import create_connected_server_and_client_session
 from mcp.types import CallToolResult, TextContent, Tool
 
-from yzel.connectors.onec import server as onec_server
+import yzel.connectors
+from tests.connector_cases import SERVERS, ServerCase, connected, watch_backend
 from yzel.core.tools import ToolKind, kind_of, make_tool
 
 ROOT = Path(__file__).resolve().parent.parent
 
-
-@dataclass(frozen=True)
-class ServerCase:
-    """One connector server plus the kind each of its tools must have."""
-
-    id: str
-    server: Server[Any, Any]
-    kinds: dict[str, ToolKind]
-    # A read tool and arguments that reach the backend when read-only mode is on.
-    read_call: tuple[str, dict[str, Any]]
-    # Points the server at a backend we can watch (see `watch_backend`) and resets any
-    # per-process state it keeps, so every test starts from a cold server.
-    point_at_backend: Callable[[pytest.MonkeyPatch, str], None]
-
-
-def _point_onec(mp: pytest.MonkeyPatch, url: str) -> None:
-    mp.setattr(onec_server, "_client", None)
-    mp.setenv("YZEL_1C_URL", url)
-    mp.setenv("YZEL_1C_USERNAME", "admin")
-    mp.setenv("YZEL_1C_PASSWORD", "test")
-
-
-SERVERS = [
-    ServerCase(
-        id="onec",
-        server=onec_server.server,
-        kinds={
-            "onec_list_entities": ToolKind.READ,
-            "onec_query": ToolKind.READ,
-            "onec_get": ToolKind.READ,
-            "onec_schema": ToolKind.READ,
-            "onec_count": ToolKind.READ,
-            "onec_create": ToolKind.CREATE,
-            "onec_update": ToolKind.UPDATE,
-            "onec_delete": ToolKind.DELETE,
-        },
-        read_call=("onec_count", {"entity": "Catalog_Контрагенты"}),
-        point_at_backend=_point_onec,
-    ),
-]
 
 # (readOnlyHint, destructiveHint, idempotentHint) per kind, from the spec.
 ANNOTATIONS: dict[ToolKind, tuple[bool | None, bool | None, bool | None]] = {
@@ -76,30 +31,6 @@ ANNOTATIONS: dict[ToolKind, tuple[bool | None, bool | None, bool | None]] = {
 }
 
 WRITE_TOOLS = [(c, n) for c in SERVERS for n, k in c.kinds.items() if k is not ToolKind.READ]
-
-
-@asynccontextmanager
-async def connected(case: ServerCase) -> AsyncIterator[ClientSession]:
-    async with create_connected_server_and_client_session(case.server) as session:
-        yield session
-
-
-@asynccontextmanager
-async def watch_backend() -> AsyncIterator[tuple[str, list[bytes]]]:
-    """A listener that records every connection made to it: proof a request was (not) sent."""
-    connections: list[bytes] = []
-
-    async def on_connect(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-        connections.append(await reader.read(1))
-        writer.close()
-
-    srv = await asyncio.start_server(on_connect, "127.0.0.1", 0)
-    port = srv.sockets[0].getsockname()[1]
-    try:
-        yield f"http://127.0.0.1:{port}/odata/standard.odata", connections
-    finally:
-        srv.close()
-        await srv.wait_closed()
 
 
 def _payload(result: CallToolResult) -> dict[str, Any]:
@@ -155,12 +86,12 @@ async def test_other_values_leave_every_tool_listed(
 
 
 async def _refused_call(
-    case: ServerCase, monkeypatch: pytest.MonkeyPatch, name: str
+    case: ServerCase, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str
 ) -> tuple[CallToolResult, list[bytes]]:
     """Call `name` with no arguments in read-only mode; also return the backend's connections."""
     monkeypatch.setenv("YZEL_READ_ONLY", "1")
     async with watch_backend() as (url, connections):
-        case.point_at_backend(monkeypatch, url)
+        case.point_at_backend(monkeypatch, url, tmp_path)
         async with connected(case) as session:
             # Like a real client: list first (the server caches that list), then call by name.
             await session.list_tools()
@@ -178,37 +109,72 @@ def _assert_refused(result: CallToolResult, connections: list[bytes]) -> None:
 
 @pytest.mark.parametrize(("case", "tool"), WRITE_TOOLS, ids=lambda v: getattr(v, "id", v))
 async def test_read_only_mode_refuses_a_hidden_write_tool_without_touching_the_backend(
-    case: ServerCase, tool: str, monkeypatch: pytest.MonkeyPatch
+    case: ServerCase, tool: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """A client with a cached tool list, or an agent guessing the name, still calls it."""
-    result, connections = await _refused_call(case, monkeypatch, tool)
+    result, connections = await _refused_call(case, monkeypatch, tmp_path, tool)
 
     _assert_refused(result, connections)
 
 
 @pytest.mark.parametrize("case", SERVERS, ids=lambda c: c.id)
 async def test_read_only_mode_refuses_a_name_the_server_does_not_list(
-    case: ServerCase, monkeypatch: pytest.MonkeyPatch
+    case: ServerCase, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Fail closed: a write branch missing from the tool list must not run either."""
-    result, connections = await _refused_call(case, monkeypatch, "no_such_tool")
+    result, connections = await _refused_call(case, monkeypatch, tmp_path, "no_such_tool")
 
     _assert_refused(result, connections)
 
 
 @pytest.mark.parametrize("case", SERVERS, ids=lambda c: c.id)
 async def test_read_only_mode_still_serves_read_tools(
-    case: ServerCase, monkeypatch: pytest.MonkeyPatch
+    case: ServerCase, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """The refusal is for everything but listed READ tools: a read call reaches the backend."""
     monkeypatch.setenv("YZEL_READ_ONLY", "1")
     tool, arguments = case.read_call
     async with watch_backend() as (url, connections):
-        case.point_at_backend(monkeypatch, url)
+        case.point_at_backend(monkeypatch, url, tmp_path)
         async with connected(case) as session:
             await session.call_tool(tool, arguments)
 
     assert connections, "the read call never reached the backend"
+
+
+# 1C and AmoCRM come back in slice 4 (1C's catch lands in slice 2, AmoCRM's in slice 4).
+TYPED_ERROR_CASES = [c for c in SERVERS if c.id not in {"onec", "amocrm"}]
+_BAD_REQUEST_BODY = b'{"message": "boom!!!"}'
+_BAD_REQUEST = (
+    b"HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\n"
+    + b"Content-Length: %d\r\nConnection: close\r\n\r\n" % len(_BAD_REQUEST_BODY)
+    + _BAD_REQUEST_BODY
+)
+
+
+@pytest.mark.parametrize("case", TYPED_ERROR_CASES, ids=lambda c: c.id)
+async def test_a_typed_backend_error_on_a_read_is_an_error_result(
+    case: ServerCase, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The model must see `isError`, not a successful-looking result that says "Ошибка"."""
+    tool, arguments = case.read_call
+    async with watch_backend(_BAD_REQUEST) as (url, connections):
+        case.point_at_backend(monkeypatch, url, tmp_path)
+        async with connected(case) as session:
+            result = await session.call_tool(tool, arguments)
+
+    assert connections, "the read call never reached the backend"
+    assert result.isError is True
+    block = result.content[0]
+    assert isinstance(block, TextContent)
+    # The server's own message, not the SDK's fallback text for an escaped exception.
+    assert block.text.startswith("Ошибка "), block.text
+
+
+def test_every_connector_package_has_a_server_case() -> None:
+    packages = {m.name for m in pkgutil.iter_modules(yzel.connectors.__path__)}
+
+    assert packages == {c.id for c in SERVERS}
 
 
 @pytest.mark.parametrize("kind", list(ToolKind))

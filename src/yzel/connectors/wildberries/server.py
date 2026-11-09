@@ -13,9 +13,11 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
+from yzel.core.outcome import error_result
+from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import WildberriesCredential
 from yzel.core.vault import CredentialVault
 
@@ -52,133 +54,146 @@ async def _ensure_client() -> WildberriesClient:
     return _client
 
 
+TOOLS: list[Tool] = [
+    make_tool(
+        name="wb_seller_info",
+        description="Показать информацию о продавце Wildberries",
+        input_schema={"type": "object", "properties": {}},
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="wb_list_warehouses",
+        description="Список складов FBS продавца",
+        input_schema={"type": "object", "properties": {}},
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="wb_new_orders",
+        description="Новые сборочные задания (очередь FBS)",
+        input_schema={"type": "object", "properties": {}},
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="wb_get_orders",
+        description="Сборочные задания за период (FBS)",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "date_from": {
+                    "type": "integer",
+                    "description": "Unix timestamp начала периода",
+                },
+                "date_to": {
+                    "type": "integer",
+                    "description": "Unix timestamp конца периода (опционально)",
+                },
+                "limit": {"type": "integer", "default": 1000},
+                "next_cursor": {"type": "integer", "default": 0},
+            },
+            "required": ["date_from"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="wb_get_stocks",
+        description="Остатки по SKU на указанном складе",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "warehouse_id": {"type": "integer"},
+                "skus": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Список штрихкодов (SKU)",
+                },
+            },
+            "required": ["warehouse_id", "skus"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="wb_update_stocks",
+        description="Обновить остатки на складе. stocks = [{sku, amount}]",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "warehouse_id": {"type": "integer"},
+                "stocks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "sku": {"type": "string"},
+                            "amount": {"type": "integer"},
+                        },
+                        "required": ["sku", "amount"],
+                    },
+                },
+            },
+            "required": ["warehouse_id", "stocks"],
+        },
+        kind=ToolKind.UPDATE,
+    ),
+    make_tool(
+        name="wb_sales",
+        description="Продажи с указанной даты (RFC3339). flag=1 — все продажи за день",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "date_from": {"type": "string", "description": "RFC3339 datetime"},
+                "flag": {"type": "integer", "default": 0},
+            },
+            "required": ["date_from"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="wb_order_stats",
+        description="Статистика заказов с указанной даты (RFC3339)",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "date_from": {"type": "string"},
+                "flag": {"type": "integer", "default": 0},
+            },
+            "required": ["date_from"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="wb_list_cards",
+        description="Список карточек товаров (пагинация через cursor)",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "default": 100},
+                "cursor": {
+                    "type": "object",
+                    "description": "Курсор продолжения с предыдущего вызова",
+                },
+            },
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="wb_get_prices",
+        description="Текущие цены и скидки по товарам",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "default": 1000},
+                "offset": {"type": "integer", "default": 0},
+            },
+        },
+        kind=ToolKind.READ,
+    ),
+]
+
+
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    """List Wildberries Seller tools."""
-    return [
-        Tool(
-            name="wb_seller_info",
-            description="Показать информацию о продавце Wildberries",
-            inputSchema={"type": "object", "properties": {}},
-        ),
-        Tool(
-            name="wb_list_warehouses",
-            description="Список складов FBS продавца",
-            inputSchema={"type": "object", "properties": {}},
-        ),
-        Tool(
-            name="wb_new_orders",
-            description="Новые сборочные задания (очередь FBS)",
-            inputSchema={"type": "object", "properties": {}},
-        ),
-        Tool(
-            name="wb_get_orders",
-            description="Сборочные задания за период (FBS)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "date_from": {
-                        "type": "integer",
-                        "description": "Unix timestamp начала периода",
-                    },
-                    "date_to": {
-                        "type": "integer",
-                        "description": "Unix timestamp конца периода (опционально)",
-                    },
-                    "limit": {"type": "integer", "default": 1000},
-                    "next_cursor": {"type": "integer", "default": 0},
-                },
-                "required": ["date_from"],
-            },
-        ),
-        Tool(
-            name="wb_get_stocks",
-            description="Остатки по SKU на указанном складе",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "warehouse_id": {"type": "integer"},
-                    "skus": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Список штрихкодов (SKU)",
-                    },
-                },
-                "required": ["warehouse_id", "skus"],
-            },
-        ),
-        Tool(
-            name="wb_update_stocks",
-            description="Обновить остатки на складе. stocks = [{sku, amount}]",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "warehouse_id": {"type": "integer"},
-                    "stocks": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "sku": {"type": "string"},
-                                "amount": {"type": "integer"},
-                            },
-                            "required": ["sku", "amount"],
-                        },
-                    },
-                },
-                "required": ["warehouse_id", "stocks"],
-            },
-        ),
-        Tool(
-            name="wb_sales",
-            description="Продажи с указанной даты (RFC3339). flag=1 — все продажи за день",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "date_from": {"type": "string", "description": "RFC3339 datetime"},
-                    "flag": {"type": "integer", "default": 0},
-                },
-                "required": ["date_from"],
-            },
-        ),
-        Tool(
-            name="wb_order_stats",
-            description="Статистика заказов с указанной даты (RFC3339)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "date_from": {"type": "string"},
-                    "flag": {"type": "integer", "default": 0},
-                },
-                "required": ["date_from"],
-            },
-        ),
-        Tool(
-            name="wb_list_cards",
-            description="Список карточек товаров (пагинация через cursor)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "limit": {"type": "integer", "default": 100},
-                    "cursor": {
-                        "type": "object",
-                        "description": "Курсор продолжения с предыдущего вызова",
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="wb_get_prices",
-            description="Текущие цены и скидки по товарам",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "limit": {"type": "integer", "default": 1000},
-                    "offset": {"type": "integer", "default": 0},
-                },
-            },
-        ),
-    ]
+    """List available Wildberries Seller tools (only the read ones in read-only mode)."""
+    return visible_tools(TOOLS)
 
 
 def _as_text(payload: Any) -> list[TextContent]:
@@ -186,7 +201,10 @@ def _as_text(payload: Any) -> list[TextContent]:
 
 
 @server.call_tool()
-async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] | CallToolResult:
+    # First, before any client or credential is touched: hiding tools in list_tools is not enough.
+    if (refused := refuse_if_read_only(TOOLS, name)) is not None:
+        return refused
     try:
         client = await _ensure_client()
 
@@ -243,7 +261,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
 
     except WildberriesError as exc:
-        return [TextContent(type="text", text=f"Ошибка Wildberries: {exc.message}")]
+        return error_result(f"Ошибка Wildberries: {exc.message}")
 
 
 async def main() -> None:
