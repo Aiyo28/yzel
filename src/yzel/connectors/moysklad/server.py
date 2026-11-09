@@ -7,8 +7,7 @@ Bearer token auth — configured via credential vault.
 from __future__ import annotations
 
 import asyncio
-import json
-from collections.abc import Awaitable, Callable
+from functools import partial
 from typing import Any
 
 from mcp.server import Server
@@ -16,7 +15,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
-from yzel.core.outcome import error_result
+from yzel.core.outcome import error_result, json_text
 from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import MoyskladCredential
 from yzel.core.vault import CredentialVault
@@ -244,24 +243,7 @@ async def list_tools() -> list[Tool]:
     return visible_tools(TOOLS)
 
 
-def _as_text(payload: Any) -> list[TextContent]:
-    return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]
-
-
-_TOOLS_BY_NAME = {t.name: t for t in TOOLS}
-
-
-def _write(
-    name: str, arguments: dict[str, Any], call: Callable[[], Awaitable[Any]]
-) -> Awaitable[CallToolResult]:
-    """Run one МойСклад write through the write runner."""
-    return run_write(
-        _TOOLS_BY_NAME[name],
-        arguments,
-        call,
-        error_types=(MoyskladError,),
-        check_tool="moysklad_list",
-    )
+_write = partial(run_write, TOOLS, error_types=(MoyskladError,), check_tool="moysklad_list")
 
 
 @server.call_tool()
@@ -277,7 +259,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             entity_type = arguments["entity"]
             meta = _ENTITY_TYPES[entity_type]
             method = getattr(client, meta["list_method"])
-            return _as_text(
+            return json_text(
                 await method(
                     limit=arguments.get("limit"),
                     offset=arguments.get("offset"),
@@ -292,7 +274,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             entity_type = arguments["entity"]
             meta = _ENTITY_TYPES[entity_type]
             method = getattr(client, meta["get_method"])
-            return _as_text(await method(arguments["id"], expand=arguments.get("expand")))
+            return json_text(await method(arguments["id"], expand=arguments.get("expand")))
 
         if name == "moysklad_create":
             entity_type = arguments["entity"]
@@ -311,13 +293,13 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
         if name == "moysklad_stock":
             mode = arguments.get("mode", "all")
             if mode == "bystore":
-                return _as_text(
+                return json_text(
                     await client.get_stock_by_store(
                         limit=arguments.get("limit"),
                         offset=arguments.get("offset"),
                     )
                 )
-            return _as_text(
+            return json_text(
                 await client.get_stock_all(
                     limit=arguments.get("limit"),
                     offset=arguments.get("offset"),
@@ -326,9 +308,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             )
 
         if name == "moysklad_organizations":
-            return _as_text(await client.get_organizations())
+            return json_text(await client.get_organizations())
 
-        return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
+        return error_result(f"Неизвестный инструмент: {name}")
 
     except MoyskladError as exc:
         return error_result(f"Ошибка МойСклад: {exc.message}")

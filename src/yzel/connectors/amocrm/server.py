@@ -7,8 +7,7 @@ OAuth2 auth with automatic token refresh — credentials from vault.
 from __future__ import annotations
 
 import asyncio
-import json
-from collections.abc import Awaitable, Callable
+from functools import partial
 from typing import Any
 
 from mcp.server import Server
@@ -16,7 +15,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
-from yzel.core.outcome import error_result
+from yzel.core.outcome import error_result, json_text
 from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import AmoCRMCredential
 from yzel.core.vault import CredentialVault
@@ -256,24 +255,9 @@ async def list_tools() -> list[Tool]:
     return visible_tools(TOOLS)
 
 
-def _as_text(payload: Any) -> list[TextContent]:
-    return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]
-
-
-_TOOLS_BY_NAME = {t.name: t for t in TOOLS}
-
-
-def _write(
-    name: str, arguments: dict[str, Any], call: Callable[[], Awaitable[Any]]
-) -> Awaitable[CallToolResult]:
-    """Run one AmoCRM write through the write runner."""
-    return run_write(
-        _TOOLS_BY_NAME[name],
-        arguments,
-        call,
-        error_types=(AmoCRMError, AmoCRMAuthError),
-        check_tool="amocrm_list",
-    )
+_write = partial(
+    run_write, TOOLS, error_types=(AmoCRMError, AmoCRMAuthError), check_tool="amocrm_list"
+)
 
 
 @server.call_tool()
@@ -297,7 +281,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
                 kwargs["query"] = arguments["query"]
             if arguments.get("with"):
                 kwargs["with_params"] = arguments["with"]
-            return _as_text(await method(**kwargs))
+            return json_text(await method(**kwargs))
 
         if name == "amocrm_get":
             entity_type = arguments["entity"]
@@ -306,7 +290,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             kwargs = {}
             if arguments.get("with"):
                 kwargs["with_params"] = arguments["with"]
-            return _as_text(await method(arguments["id"], **kwargs))
+            return json_text(await method(arguments["id"], **kwargs))
 
         if name == "amocrm_create":
             entity_type = arguments["entity"]
@@ -325,13 +309,13 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
         if name == "amocrm_pipelines":
             pipeline_id = arguments.get("pipeline_id")
             if pipeline_id:
-                return _as_text(await client.get_pipeline(pipeline_id))
-            return _as_text(await client.get_pipelines())
+                return json_text(await client.get_pipeline(pipeline_id))
+            return json_text(await client.get_pipelines())
 
         if name == "amocrm_account":
-            return _as_text(await client.get_account(with_params=arguments.get("with")))
+            return json_text(await client.get_account(with_params=arguments.get("with")))
 
-        return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
+        return error_result(f"Неизвестный инструмент: {name}")
 
     except AmoCRMError as exc:
         return error_result(f"Ошибка AmoCRM: {exc.detail}")

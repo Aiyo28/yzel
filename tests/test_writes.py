@@ -18,6 +18,8 @@ SCHEMA: dict[str, Any] = {"type": "object", "properties": {}}
 CREATE = make_tool("thing_create", "create", SCHEMA, ToolKind.CREATE)
 UPDATE = make_tool("thing_update", "update", SCHEMA, ToolKind.UPDATE)
 DELETE = make_tool("thing_delete", "delete", SCHEMA, ToolKind.DELETE)
+OTHER = make_tool("other_create", "create", SCHEMA, ToolKind.CREATE)
+TOOLS = [CREATE, UPDATE, DELETE, OTHER]
 
 
 class ThingError(Exception):
@@ -71,7 +73,12 @@ async def run(
     check_tool: str | None = "thing_query",
 ) -> CallToolResult:
     return await run_write(
-        tool, arguments or {}, spy, error_types=(ThingError, StatusError), check_tool=check_tool
+        TOOLS,
+        tool.name,
+        arguments or {},
+        spy,
+        error_types=(ThingError, StatusError),
+        check_tool=check_tool,
     )
 
 
@@ -82,7 +89,7 @@ async def test_applied_returns_payload() -> None:
     assert body(result)["result"] == {"Ref_Key": "abc"}
 
 
-@pytest.mark.parametrize("status", [400, 404, 409, 429, None])
+@pytest.mark.parametrize("status", [400, 404, 409, None])
 @pytest.mark.parametrize("tool", [CREATE, UPDATE, DELETE])
 async def test_typed_error_below_500_is_rejected(tool: Tool, status: int | None) -> None:
     result = await run(tool, Spy(raises=ThingError(status, "Не заполнено поле")))
@@ -182,10 +189,9 @@ async def test_guard_window_is_ten_minutes(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 async def test_different_arguments_or_tool_are_not_duplicates() -> None:
-    other = make_tool("other_create", "create", SCHEMA, ToolKind.CREATE)
     await run(CREATE, Spy(returns=1), {"entity": "A"})
     assert body(await run(CREATE, Spy(returns=1), {"entity": "B"}))["outcome"] == "applied"
-    assert body(await run(other, Spy(returns=1), {"entity": "A"}))["outcome"] == "applied"
+    assert body(await run(OTHER, Spy(returns=1), {"entity": "A"}))["outcome"] == "applied"
 
 
 async def test_rejected_and_not_sent_creates_are_not_recorded() -> None:
@@ -258,7 +264,67 @@ class DescriptionError(Exception):
     ("exc", "text"), [(DetailError(), "Неверный pipeline"), (DescriptionError(), "Чат не найден")]
 )
 async def test_reason_reads_detail_and_description(exc: Exception, text: str) -> None:
-    result = await run_write(CREATE, {}, Spy(raises=exc), error_types=(type(exc),))
+    result = await run_write(TOOLS, CREATE.name, {}, Spy(raises=exc), error_types=(type(exc),))
     assert body(result)["outcome"] == "rejected"
     assert text in body(result)["message"]
     assert "error" not in body(result)["message"]
+
+
+async def test_unknown_tool_name_is_a_programming_error() -> None:
+    with pytest.raises(ValueError, match="no_such_tool"):
+        await run_write(TOOLS, "no_such_tool", {}, Spy(), error_types=(ThingError,))
+
+
+async def test_rejected_message_does_not_double_the_full_stop() -> None:
+    result = await run(CREATE, Spy(raises=ThingError(400, "Не заполнено поле.")))
+    assert "Не заполнено поле. Ничего" in body(result)["message"]
+    assert ".." not in body(result)["message"]
+
+
+class RetryAfterError(Exception):
+    """Telegram style: `retry_after` seconds on a 429."""
+
+    def __init__(self, retry_after: int | None) -> None:
+        self.status_code = 429
+        self.retry_after = retry_after
+        self.description = "Too Many Requests"
+        super().__init__("Telegram error")
+
+
+class EmptyDetailError(Exception):
+    """AmoCRM style: status in `.status`, nothing readable in `.detail`."""
+
+    def __init__(self) -> None:
+        self.status = 429
+        self.detail = ""
+        super().__init__("AmoCRM error [429]: ")
+
+
+@pytest.mark.parametrize("tool", [CREATE, UPDATE, DELETE])
+async def test_429_says_wait_and_names_the_retry_after_seconds(tool: Tool) -> None:
+    result = await run_write(
+        TOOLS, tool.name, {}, Spy(raises=RetryAfterError(7)), error_types=(RetryAfterError,)
+    )
+    out = body(result)
+    assert out["outcome"] == "rejected"
+    assert out["message"] == (
+        "Слишком много запросов, ничего не записано. Подождите 7 с и отправьте заново."
+    )
+
+
+async def test_429_without_a_usable_retry_after_still_says_wait() -> None:
+    for exc in (RetryAfterError(None), EmptyDetailError()):
+        result = await run_write(TOOLS, CREATE.name, {}, Spy(raises=exc), error_types=(type(exc),))
+        assert body(result)["message"] == (
+            "Слишком много запросов, ничего не записано. Подождите и отправьте заново."
+        )
+
+
+async def test_create_without_check_tool_points_the_agent_to_look_by_hand() -> None:
+    args = {"chat_id": 1}
+    first = await run(CREATE, Spy(raises=httpx.ReadTimeout("")), args, check_tool=None)
+    assert "Запрос мог быть выполнен" in body(first)["message"]
+    assert "вручную" in body(first)["message"]
+    second = await run(CREATE, Spy(returns=1), args, check_tool=None)
+    assert body(second)["outcome"] == "duplicate_refused"
+    assert "убедитесь вручную" in body(second)["message"]

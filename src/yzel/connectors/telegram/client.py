@@ -83,6 +83,7 @@ class TelegramClient:
         bot_token: str,
         base_url: str = "https://api.telegram.org",
         max_per_second: float = 25.0,
+        *,
         timeout: float = 60.0,  # long enough for long-polling getUpdates
     ) -> None:
         self._token = bot_token

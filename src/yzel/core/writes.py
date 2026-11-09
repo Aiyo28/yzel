@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
 import httpx
@@ -77,12 +77,32 @@ def _reason(exc: Exception) -> str:
     return str(exc) or type(exc).__name__
 
 
+def _rejected(exc: Exception) -> CallToolResult:
+    """The service refused the call, nothing written. 429: wait; anything else: fix the request."""
+    if status_of(exc) == 429:
+        retry = getattr(exc, "retry_after", None)
+        is_seconds = isinstance(retry, int | float) and not isinstance(retry, bool)
+        wait = f" {retry:g} с" if is_seconds else ""
+        return outcome_result(
+            Outcome.REJECTED,
+            f"Слишком много запросов, ничего не записано. Подождите{wait} и отправьте заново.",
+        )
+    return outcome_result(
+        Outcome.REJECTED,
+        f"{_reason(exc).rstrip('.')}. Ничего не записано: исправьте запрос и отправьте заново.",
+    )
+
+
 def _may_have_applied(is_create: bool, check_tool: str | None) -> CallToolResult:
     if is_create:
-        look = f" — проверьте через {check_tool}" if check_tool else ""
+        look = (
+            f" — проверьте через {check_tool}"
+            if check_tool
+            else " — сначала убедитесь вручную, что первый выполнился"
+        )
         return outcome_result(
             Outcome.MAY_HAVE_APPLIED,
-            f"Запись могла быть создана. Не отправляйте этот запрос повторно{look}. "
+            f"Запрос мог быть выполнен. Не отправляйте его повторно{look}. "
             "Такой же запрос будет отклонён.",
             resend_safe=False,
             check_tool=check_tool,
@@ -96,14 +116,22 @@ def _may_have_applied(is_create: bool, check_tool: str | None) -> CallToolResult
 
 
 async def run_write(
-    tool: Tool,
+    tools: Sequence[Tool],
+    name: str,
     arguments: dict[str, Any],
     call: Callable[[], Awaitable[Any]],
     *,
     error_types: tuple[type[Exception], ...],
     check_tool: str | None = None,
 ) -> CallToolResult:
-    """Run one write call and report its outcome. Other exceptions propagate unchanged."""
+    """Run the write tool `name` (looked up in `tools`) and report its outcome.
+
+    An unknown `name` raises ValueError: the server's own branches pass only names it lists.
+    Other exceptions from `call` propagate unchanged.
+    """
+    tool = next((t for t in tools if t.name == name), None)
+    if tool is None:
+        raise ValueError(f"Нет инструмента {name}")
     is_create = kind_of(tool) is ToolKind.CREATE
     key = _guard_key(tool, arguments)
     typed_errors: tuple[type[Exception], ...] = (*error_types, httpx.HTTPStatusError)
@@ -112,11 +140,15 @@ async def run_write(
     # batch can both pass. Sequential retries (the case this guards) are caught. Upgrade: record
     # a pending marker before sending if parallel duplicates are ever seen.
     if is_create and arguments.get("again") is not True and _recently_made(key):
-        look = f"Сначала проверьте через {check_tool}. " if check_tool else "Сначала проверьте. "
+        look = (
+            f"Сначала проверьте через {check_tool}. "
+            if check_tool
+            else "Сначала убедитесь вручную, что первого нет. "
+        )
         return outcome_result(
             Outcome.DUPLICATE_REFUSED,
             "Такой же запрос уже выполнялся за последние 10 минут, повтор не отправлен. "
-            f"{look}Если записи нет, повторите с again: true.",
+            f"{look}Если его нет, повторите с again: true.",
         )
 
     try:
@@ -133,10 +165,7 @@ async def run_write(
     except typed_errors as exc:
         status = status_of(exc)
         if status is None or status < 500:
-            return outcome_result(
-                Outcome.REJECTED,
-                f"{_reason(exc)}. Ничего не записано: исправьте запрос и отправьте заново.",
-            )
+            return _rejected(exc)
         result = _may_have_applied(is_create, check_tool)
     else:
         result = outcome_result(Outcome.APPLIED, "Выполнено.", result=payload)

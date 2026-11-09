@@ -7,8 +7,7 @@ Webhook-based auth — no token management needed.
 from __future__ import annotations
 
 import asyncio
-import json
-from collections.abc import Awaitable, Callable
+from functools import partial
 from typing import Any
 
 from mcp.server import Server
@@ -16,7 +15,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
-from yzel.core.outcome import error_result
+from yzel.core.outcome import error_result, json_text
 from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import Bitrix24Credential
 from yzel.core.vault import CredentialVault
@@ -253,24 +252,7 @@ async def list_tools() -> list[Tool]:
     return visible_tools(TOOLS)
 
 
-def _as_text(payload: Any) -> list[TextContent]:
-    return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]
-
-
-_TOOLS_BY_NAME = {t.name: t for t in TOOLS}
-
-
-def _write(
-    name: str, arguments: dict[str, Any], call: Callable[[], Awaitable[Any]]
-) -> Awaitable[CallToolResult]:
-    """Run one Bitrix24 write through the write runner."""
-    return run_write(
-        _TOOLS_BY_NAME[name],
-        arguments,
-        call,
-        error_types=(Bitrix24Error,),
-        check_tool="bitrix24_crm_list",
-    )
+_write = partial(run_write, TOOLS, error_types=(Bitrix24Error,), check_tool="bitrix24_crm_list")
 
 
 @server.call_tool()
@@ -286,7 +268,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             entity_type = arguments["entity"]
             meta = _CRM_ENTITIES[entity_type]
             method = getattr(client, meta["list_method"])
-            return _as_text(
+            return json_text(
                 await method(
                     select=arguments.get("select"),
                     filter_params=arguments.get("filter"),
@@ -299,7 +281,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             entity_type = arguments["entity"]
             meta = _CRM_ENTITIES[entity_type]
             method = getattr(client, meta["get_method"])
-            return _as_text(await method(arguments["id"]))
+            return json_text(await method(arguments["id"]))
 
         if name == "bitrix24_crm_create":
             entity_type = arguments["entity"]
@@ -316,7 +298,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             )
 
         if name == "bitrix24_tasks_list":
-            return _as_text(
+            return json_text(
                 await client.get_tasks(
                     select=arguments.get("select"),
                     filter_params=arguments.get("filter"),
@@ -326,9 +308,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             )
 
         if name == "bitrix24_task_get":
-            return _as_text(await client.get_task(arguments["id"]))
+            return json_text(await client.get_task(arguments["id"]))
 
-        return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
+        return error_result(f"Неизвестный инструмент: {name}")
 
     except Bitrix24Error as exc:
         return error_result(f"Ошибка Bitrix24: {exc.description}")

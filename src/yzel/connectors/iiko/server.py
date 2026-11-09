@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import json
-from collections.abc import Awaitable, Callable
+from functools import partial
 from typing import Any
 
 from mcp.server import Server
@@ -12,7 +11,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
-from yzel.core.outcome import error_result
+from yzel.core.outcome import error_result, json_text
 from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import IikoCredential
 from yzel.core.vault import CredentialVault
@@ -164,24 +163,7 @@ async def list_tools() -> list[Tool]:
     return visible_tools(TOOLS)
 
 
-def _as_text(payload: Any) -> list[TextContent]:
-    return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]
-
-
-_TOOLS_BY_NAME = {t.name: t for t in TOOLS}
-
-
-def _write(
-    name: str, arguments: dict[str, Any], call: Callable[[], Awaitable[Any]]
-) -> Awaitable[CallToolResult]:
-    """Run one iiko write through the write runner."""
-    return run_write(
-        _TOOLS_BY_NAME[name],
-        arguments,
-        call,
-        error_types=(IikoError,),
-        check_tool="iiko_deliveries_by_phone",
-    )
+_write = partial(run_write, TOOLS, error_types=(IikoError,), check_tool="iiko_deliveries_by_phone")
 
 
 @server.call_tool()
@@ -193,19 +175,19 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
         client = await _ensure_client()
 
         if name == "iiko_organizations":
-            return _as_text(await client.get_organizations(arguments.get("organization_ids")))
+            return json_text(await client.get_organizations(arguments.get("organization_ids")))
 
         if name == "iiko_terminal_groups":
-            return _as_text(await client.get_terminal_groups(arguments["organization_ids"]))
+            return json_text(await client.get_terminal_groups(arguments["organization_ids"]))
 
         if name == "iiko_nomenclature":
-            return _as_text(await client.get_nomenclature(arguments["organization_id"]))
+            return json_text(await client.get_nomenclature(arguments["organization_id"]))
 
         if name == "iiko_stop_list":
-            return _as_text(await client.get_stop_list(arguments["organization_ids"]))
+            return json_text(await client.get_stop_list(arguments["organization_ids"]))
 
         if name == "iiko_deliveries_by_phone":
-            return _as_text(
+            return json_text(
                 await client.get_deliveries_by_phone(
                     organization_ids=arguments["organization_ids"],
                     phone=arguments["phone"],
@@ -226,15 +208,15 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             )
 
         if name == "iiko_order_types":
-            return _as_text(await client.get_order_types(arguments["organization_ids"]))
+            return json_text(await client.get_order_types(arguments["organization_ids"]))
 
         if name == "iiko_payment_types":
-            return _as_text(await client.get_payment_types(arguments["organization_ids"]))
+            return json_text(await client.get_payment_types(arguments["organization_ids"]))
 
         if name == "iiko_employees":
-            return _as_text(await client.get_employees(arguments["organization_ids"]))
+            return json_text(await client.get_employees(arguments["organization_ids"]))
 
-        return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
+        return error_result(f"Неизвестный инструмент: {name}")
 
     except IikoError as exc:
         return error_result(f"Ошибка iiko: {exc.message}")

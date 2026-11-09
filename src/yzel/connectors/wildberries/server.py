@@ -8,8 +8,7 @@ rather than raw httpx exceptions.
 from __future__ import annotations
 
 import asyncio
-import json
-from collections.abc import Awaitable, Callable
+from functools import partial
 from typing import Any
 
 from mcp.server import Server
@@ -17,7 +16,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
-from yzel.core.outcome import error_result
+from yzel.core.outcome import error_result, json_text
 from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import WildberriesCredential
 from yzel.core.vault import CredentialVault
@@ -198,24 +197,7 @@ async def list_tools() -> list[Tool]:
     return visible_tools(TOOLS)
 
 
-def _as_text(payload: Any) -> list[TextContent]:
-    return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]
-
-
-_TOOLS_BY_NAME = {t.name: t for t in TOOLS}
-
-
-def _write(
-    name: str, arguments: dict[str, Any], call: Callable[[], Awaitable[Any]]
-) -> Awaitable[CallToolResult]:
-    """Run one Wildberries write through the write runner."""
-    return run_write(
-        _TOOLS_BY_NAME[name],
-        arguments,
-        call,
-        error_types=(WildberriesError,),
-        check_tool=None,
-    )
+_write = partial(run_write, TOOLS, error_types=(WildberriesError,))
 
 
 @server.call_tool()
@@ -227,16 +209,16 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
         client = await _ensure_client()
 
         if name == "wb_seller_info":
-            return _as_text(await client.get_seller_info())
+            return json_text(await client.get_seller_info())
 
         if name == "wb_list_warehouses":
-            return _as_text(await client.list_warehouses())
+            return json_text(await client.list_warehouses())
 
         if name == "wb_new_orders":
-            return _as_text(await client.get_new_orders())
+            return json_text(await client.get_new_orders())
 
         if name == "wb_get_orders":
-            return _as_text(
+            return json_text(
                 await client.get_orders(
                     date_from=arguments["date_from"],
                     date_to=arguments.get("date_to"),
@@ -246,7 +228,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             )
 
         if name == "wb_get_stocks":
-            return _as_text(await client.get_stocks(arguments["warehouse_id"], arguments["skus"]))
+            return json_text(await client.get_stocks(arguments["warehouse_id"], arguments["skus"]))
 
         if name == "wb_update_stocks":
 
@@ -257,30 +239,30 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             return await _write(name, arguments, update_stocks)
 
         if name == "wb_sales":
-            return _as_text(
+            return json_text(
                 await client.get_sales(arguments["date_from"], arguments.get("flag", 0))
             )
 
         if name == "wb_order_stats":
-            return _as_text(
+            return json_text(
                 await client.get_order_stats(arguments["date_from"], arguments.get("flag", 0))
             )
 
         if name == "wb_list_cards":
-            return _as_text(
+            return json_text(
                 await client.list_cards(
                     limit=arguments.get("limit", 100), cursor=arguments.get("cursor")
                 )
             )
 
         if name == "wb_get_prices":
-            return _as_text(
+            return json_text(
                 await client.get_prices(
                     limit=arguments.get("limit", 1000), offset=arguments.get("offset", 0)
                 )
             )
 
-        return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
+        return error_result(f"Неизвестный инструмент: {name}")
 
     except WildberriesError as exc:
         return error_result(f"Ошибка Wildberries: {exc.message}")

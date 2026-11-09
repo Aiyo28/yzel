@@ -37,3 +37,8 @@ def outcome_result(outcome: Outcome, message: str, **fields: Any) -> CallToolRes
 def error_result(text: str) -> CallToolResult:
     """Plain-text error for read tools."""
     return _text_result(text, is_error=True)
+
+
+def json_text(payload: Any) -> list[TextContent]:
+    """A successful read result: `payload` as pretty JSON in one text block."""
+    return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]

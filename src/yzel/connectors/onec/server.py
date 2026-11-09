@@ -7,9 +7,8 @@ Handles dynamic schema discovery and Cyrillic entity names.
 from __future__ import annotations
 
 import asyncio
-import json
 import os
-from collections.abc import Awaitable, Callable
+from functools import partial
 from typing import Any
 
 from mcp.server import Server
@@ -18,7 +17,7 @@ from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
 from yzel.core.discovery import discover_schema
-from yzel.core.outcome import error_result
+from yzel.core.outcome import error_result, json_text
 from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import OneCCredential, SchemaEntity
 from yzel.core.vault import CredentialVault
@@ -227,24 +226,7 @@ async def list_tools() -> list[Tool]:
     return visible_tools(TOOLS)
 
 
-def _as_text(payload: Any) -> list[TextContent]:
-    return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]
-
-
-_TOOLS_BY_NAME = {t.name: t for t in TOOLS}
-
-
-def _write(
-    name: str, arguments: dict[str, Any], call: Callable[[], Awaitable[Any]]
-) -> Awaitable[CallToolResult]:
-    """Run one 1C write through the write runner."""
-    return run_write(
-        _TOOLS_BY_NAME[name],
-        arguments,
-        call,
-        error_types=(OneCError,),
-        check_tool="onec_query",
-    )
+_write = partial(run_write, TOOLS, error_types=(OneCError,), check_tool="onec_query")
 
 
 @server.call_tool()
@@ -257,7 +239,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
         client = await _ensure_client()
 
         if name == "onec_list_entities":
-            return _as_text([e.entity_name for e in await _ensure_schema()])
+            return json_text([e.entity_name for e in await _ensure_schema()])
 
         if name == "onec_query":
             results = await client.get_entity_list(
@@ -266,13 +248,13 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
                 filter_expr=arguments.get("filter"),
                 select=arguments.get("select"),
             )
-            return _as_text(results)
+            return json_text(results)
 
         if name == "onec_get":
             result = await client.get_entity(arguments["entity"], arguments["key"])
             if result is None:
                 return [TextContent(type="text", text="Запись не найдена")]
-            return _as_text(result)
+            return json_text(result)
 
         if name == "onec_schema":
             entity_name = arguments["entity"]
@@ -282,7 +264,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
                     TextContent(type="text", text=f"Объект '{entity_name}' не найден в метаданных")
                 ]
             schema = matching[0]
-            return _as_text(
+            return json_text(
                 [
                     {"name": f.name, "type": f.field_type, "nullable": f.nullable}
                     for f in schema.fields
@@ -319,7 +301,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
 
             return await _write(name, arguments, delete)
 
-        return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
+        return error_result(f"Неизвестный инструмент: {name}")
 
     except OneCError as exc:
         return error_result(f"Ошибка 1С: {exc.message}")

@@ -75,6 +75,7 @@ class OzonClient:
         api_key: str,
         base_url: str = "https://api-seller.ozon.ru",
         max_per_second: float = 5.0,
+        *,
         timeout: float = 30.0,
     ) -> None:
         self._client_id = client_id

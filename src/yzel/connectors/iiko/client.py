@@ -75,6 +75,7 @@ class IikoClient:
         api_login: str,
         base_url: str = "https://api-ru.iiko.services",
         max_per_second: float = 0.25,
+        *,
         timeout: float = 30.0,
     ) -> None:
         self._api_login = api_login

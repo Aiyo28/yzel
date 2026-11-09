@@ -161,6 +161,21 @@ async def test_a_typed_backend_error_on_a_read_is_an_error_result(
     assert block.text.startswith("Ошибка "), block.text
 
 
+@pytest.mark.parametrize("case", SERVERS, ids=lambda c: c.id)
+async def test_an_unknown_tool_name_is_an_error_result(
+    case: ServerCase, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    async with watch_backend() as (url, _):
+        case.point_at_backend(monkeypatch, url, tmp_path)
+        async with connected(case) as session:
+            result = await session.call_tool("no_such_tool", {})
+
+    assert result.isError is True
+    block = result.content[0]
+    assert isinstance(block, TextContent)
+    assert "Неизвестный инструмент" in block.text
+
+
 def test_every_connector_package_has_a_server_case() -> None:
     packages = {m.name for m in pkgutil.iter_modules(yzel.connectors.__path__)}
 
