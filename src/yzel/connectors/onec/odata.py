@@ -61,8 +61,11 @@ def _parse_odata_error(response: httpx.Response) -> OneCError:
 class OneCODataClient:
     """Async client for 1C Enterprise OData v3 REST API."""
 
-    def __init__(self, base_url: str, username: str, password: str) -> None:
+    def __init__(
+        self, base_url: str, username: str, password: str, *, timeout: float = 30.0
+    ) -> None:
         self._base_url = base_url.rstrip("/")
+        self._timeout = timeout
         self._auth = (username, password)
         self._client: httpx.AsyncClient | None = None
 
@@ -74,7 +77,7 @@ class OneCODataClient:
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
                 auth=self._auth,
-                timeout=30.0,
+                timeout=self._timeout,
                 verify=True,
                 headers={"Accept": "application/json"},
             )

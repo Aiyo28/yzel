@@ -17,9 +17,11 @@ from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
 from yzel.core.discovery import discover_schema
+from yzel.core.outcome import error_result
 from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import OneCCredential, SchemaEntity
 from yzel.core.vault import CredentialVault
+from yzel.core.writes import run_write
 
 from .odata import OneCError, OneCODataClient, detect_deployment
 
@@ -213,6 +215,28 @@ def _as_text(payload: Any) -> list[TextContent]:
     return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]
 
 
+_WRITE_TOOLS = {"onec_create", "onec_update", "onec_delete"}
+
+
+async def _run_onec_write(
+    client: OneCODataClient, name: str, arguments: dict[str, Any]
+) -> CallToolResult:
+    """Run onec_create / onec_update / onec_delete through the write runner."""
+    tool = next(t for t in TOOLS if t.name == name)
+
+    async def call() -> Any:
+        if name == "onec_create":
+            return await client.create_entity(arguments["entity"], arguments["data"])
+        if name == "onec_update":
+            return await client.update_entity(
+                arguments["entity"], arguments["key"], arguments["data"]
+            )
+        await client.delete_entity(arguments["entity"], arguments["key"])
+        return "Запись помечена на удаление"
+
+    return await run_write(tool, arguments, call, error_types=(OneCError,), check_tool="onec_query")
+
+
 @server.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] | CallToolResult:
     """Handle tool calls."""
@@ -261,24 +285,13 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             )
             return [TextContent(type="text", text=str(total))]
 
-        if name == "onec_create":
-            created = await client.create_entity(arguments["entity"], arguments["data"])
-            return _as_text(created)
-
-        if name == "onec_update":
-            updated = await client.update_entity(
-                arguments["entity"], arguments["key"], arguments["data"]
-            )
-            return _as_text(updated)
-
-        if name == "onec_delete":
-            await client.delete_entity(arguments["entity"], arguments["key"])
-            return [TextContent(type="text", text="Запись помечена на удаление")]
+        if name in _WRITE_TOOLS:
+            return await _run_onec_write(client, name, arguments)
 
         return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
 
     except OneCError as exc:
-        return [TextContent(type="text", text=f"Ошибка 1С: {exc.message}")]
+        return error_result(f"Ошибка 1С: {exc.message}")
 
 
 async def main() -> None:
