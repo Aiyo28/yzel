@@ -2,8 +2,8 @@
 
 Written 2026-09-05 against `v0.1.0` (`master` @ `46c9f78`).
 
-Yzel has 138 passing unit tests. That number is easy to misread, so this document exists to
-say precisely what it covers and what it does not. **138 green does not mean "the connectors
+Yzel has a passing unit-test suite. A green run is easy to misread, so this document exists to
+say precisely what it covers and what it does not. **Green does not mean "the connectors
 work."** It means the clients behave correctly against mocks that this repo wrote.
 
 ## Run the suite

@@ -95,7 +95,7 @@ pip install yzel        # или: uv tool install yzel
 git clone https://github.com/Aiyo28/yzel.git
 cd yzel
 uv sync --extra dev
-uv run pytest           # тесты / tests
+uv run pytest
 ```
 
 ---

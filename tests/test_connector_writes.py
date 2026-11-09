@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from mcp.types import CallToolResult, TextContent
+from mcp.types import TextContent
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -20,6 +20,7 @@ from tests.connector_cases import (
     SERVERS,
     WRITE_CASES,
     ServerCase,
+    call_tool,
     connected,
     watch_backend,
 )
@@ -43,12 +44,6 @@ TELEGRAM = CASES_BY_ID["telegram"]
 OZON = CASES_BY_ID["ozon"]
 
 
-async def call(case: ServerCase, name: str, arguments: dict[str, Any]) -> CallToolResult:
-    """One tool call over an in-memory MCP session, like a real client; `_client` is injected."""
-    async with connected(case) as session:
-        return await session.call_tool(name, arguments)
-
-
 async def test_iiko_timeout_after_commit_blocks_the_identical_resend() -> None:
     orders: list[dict[str, Any]] = []
 
@@ -65,7 +60,7 @@ async def test_iiko_timeout_after_commit_blocks_the_identical_resend() -> None:
     async with serving(app) as url:
         iiko._client = IikoClient("k", base_url=url, timeout=CLIENT_TIMEOUT, max_per_second=100)
         try:
-            first = await call(IIKO, "iiko_create_delivery", dict(args))
+            first = await call_tool(IIKO, "iiko_create_delivery", dict(args))
             assert first.isError is True
             assert body(first)["outcome"] == "may_have_applied"
             assert body(first)["resend_safe"] is False
@@ -73,11 +68,11 @@ async def test_iiko_timeout_after_commit_blocks_the_identical_resend() -> None:
             assert "iiko_deliveries_by_phone" in body(first)["message"]
             assert len(orders) == 1
 
-            second = await call(IIKO, "iiko_create_delivery", dict(args))
+            second = await call_tool(IIKO, "iiko_create_delivery", dict(args))
             assert body(second)["outcome"] == "duplicate_refused"
             assert len(orders) == 1  # the mock never saw the resend
 
-            third = await call(IIKO, "iiko_create_delivery", {**args, "again": True})
+            third = await call_tool(IIKO, "iiko_create_delivery", {**args, "again": True})
             assert body(third)["outcome"] == "may_have_applied"
             assert len(orders) == 2
         finally:
@@ -93,7 +88,7 @@ async def test_telegram_timeout_after_send_blocks_the_identical_resend_and_names
     async with serving(app) as url:
         telegram._client = TelegramClient("1:t", base_url=url, timeout=CLIENT_TIMEOUT)
         try:
-            first = await call(TELEGRAM, "tg_send_message", dict(args))
+            first = await call_tool(TELEGRAM, "tg_send_message", dict(args))
             assert first.isError is True
             assert body(first)["outcome"] == "may_have_applied"
             assert body(first)["resend_safe"] is False
@@ -101,7 +96,7 @@ async def test_telegram_timeout_after_send_blocks_the_identical_resend_and_names
             assert "tg_" not in body(first)["message"]
             assert len(sent) == 1
 
-            second = await call(TELEGRAM, "tg_send_message", dict(args))
+            second = await call_tool(TELEGRAM, "tg_send_message", dict(args))
             assert body(second)["outcome"] == "duplicate_refused"
             assert "tg_" not in body(second)["message"]
             assert len(sent) == 1  # the chat gets one message, not two
@@ -120,13 +115,13 @@ async def test_ozon_update_prices_timeout_says_resend_is_safe_and_does_not_guard
     async with serving(app) as url:
         ozon._client = OzonClient("1", "k", base_url=url, timeout=CLIENT_TIMEOUT)
         try:
-            first = await call(OZON, "ozon_update_prices", dict(args))
+            first = await call_tool(OZON, "ozon_update_prices", dict(args))
             assert first.isError is True
             assert body(first)["outcome"] == "may_have_applied"
             assert body(first)["resend_safe"] is True
             assert len(received) == 1
 
-            second = await call(OZON, "ozon_update_prices", dict(args))
+            second = await call_tool(OZON, "ozon_update_prices", dict(args))
             assert body(second)["outcome"] == "may_have_applied"
             assert len(received) == 2  # updates are idempotent: the resend goes through
         finally:

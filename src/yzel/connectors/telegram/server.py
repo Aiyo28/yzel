@@ -338,7 +338,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
         return error_result(f"Неизвестный инструмент: {name}")
 
     except TelegramError as exc:
-        hint = f" — подождите {exc.retry_after}с" if exc.retry_after else ""
+        hint = f" — подождите {exc.retry_after:g} с" if exc.retry_after else ""
         return error_result(f"Ошибка Telegram: {exc.description}{hint}")
 
 

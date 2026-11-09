@@ -18,6 +18,7 @@ import pytest
 from mcp import ClientSession
 from mcp.server import Server
 from mcp.shared.memory import create_connected_server_and_client_session
+from mcp.types import CallToolResult
 
 from yzel.connectors.amocrm import server as amocrm_server
 from yzel.connectors.amocrm.client import AmoCRMClient
@@ -335,6 +336,12 @@ BAD_REQUEST = (
 async def connected(case: ServerCase) -> AsyncIterator[ClientSession]:
     async with create_connected_server_and_client_session(case.server) as session:
         yield session
+
+
+async def call_tool(case: ServerCase, name: str, arguments: dict[str, Any]) -> CallToolResult:
+    """One tool call over an in-memory MCP session, like a real client."""
+    async with connected(case) as session:
+        return await session.call_tool(name, arguments)
 
 
 @asynccontextmanager

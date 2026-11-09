@@ -11,19 +11,19 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from mcp.types import CallToolResult, TextContent
+from mcp.types import TextContent
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
-from tests.connector_cases import SERVERS, ServerCase, connected
+from tests.connector_cases import CASES_BY_ID, call_tool
 from tests.harness import CLIENT_TIMEOUT, STALL_SECONDS, body, serving
 from yzel.connectors.onec import server as onec
 from yzel.connectors.onec.odata import OneCODataClient
 from yzel.core import writes
 
-ONEC_CASE = next(c for c in SERVERS if c.id == "onec")
+ONEC_CASE = CASES_BY_ID["onec"]
 BASE = "/odata/standard.odata"
 ARGS = {"entity": "Catalog_Slow", "data": {"Description": "ООО Ромашка"}}
 
@@ -42,11 +42,6 @@ async def _bad_request(request: Request) -> JSONResponse:
         {"odata.error": {"code": "400", "message": {"lang": "ru", "value": "Не заполнено ИНН"}}},
         status_code=400,
     )
-
-
-async def _call(case: ServerCase, name: str, arguments: dict[str, Any]) -> CallToolResult:
-    async with connected(case) as session:
-        return await session.call_tool(name, arguments)
 
 
 async def test_timeout_after_commit_blocks_the_identical_resend(
@@ -70,18 +65,18 @@ async def test_timeout_after_commit_blocks_the_identical_resend(
             lambda *a, **k: OneCODataClient(*a, **k, timeout=CLIENT_TIMEOUT),
         )
 
-        first = await _call(ONEC_CASE, "onec_create", dict(ARGS))
+        first = await call_tool(ONEC_CASE, "onec_create", dict(ARGS))
         assert first.isError is True
         assert body(first)["outcome"] == "may_have_applied"
         assert body(first)["resend_safe"] is False
         assert "onec_query" in body(first)["message"]
         assert len(created) == 1  # 1C committed it
 
-        second = await _call(ONEC_CASE, "onec_create", dict(ARGS))
+        second = await call_tool(ONEC_CASE, "onec_create", dict(ARGS))
         assert body(second)["outcome"] == "duplicate_refused"
         assert len(created) == 1  # the mock never saw a second request
 
-        third = await _call(ONEC_CASE, "onec_create", {**ARGS, "again": True})
+        third = await call_tool(ONEC_CASE, "onec_create", {**ARGS, "again": True})
         assert body(third)["outcome"] == "may_have_applied"
         assert len(created) == 2
 
@@ -92,7 +87,7 @@ async def test_1c_400_on_create_is_rejected_with_the_reason(
     app = Starlette(routes=[Route(f"{BASE}/Catalog_Bad", _bad_request, methods=["POST"])])
     async with serving(app) as url:
         ONEC_CASE.point_at_backend(monkeypatch, url, tmp_path)
-        result = await _call(ONEC_CASE, "onec_create", {"entity": "Catalog_Bad", "data": {}})
+        result = await call_tool(ONEC_CASE, "onec_create", {"entity": "Catalog_Bad", "data": {}})
 
     assert result.isError is True
     assert body(result)["outcome"] == "rejected"
@@ -114,7 +109,7 @@ async def test_first_write_of_a_session_ends_in_an_outcome_when_metadata_is_down
     )
     async with serving(app) as url:
         ONEC_CASE.point_at_backend(monkeypatch, url, tmp_path)
-        result = await _call(ONEC_CASE, "onec_create", {"entity": "Catalog_X", "data": {}})
+        result = await call_tool(ONEC_CASE, "onec_create", {"entity": "Catalog_X", "data": {}})
 
     assert body(result)["outcome"] == ("rejected" if entity_route else "applied")
 
@@ -123,7 +118,7 @@ async def test_cold_server_with_refused_connection_is_not_sent(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     ONEC_CASE.point_at_backend(monkeypatch, "http://127.0.0.1:1", tmp_path)
-    result = await _call(ONEC_CASE, "onec_create", {"entity": "Catalog_X", "data": {}})
+    result = await call_tool(ONEC_CASE, "onec_create", {"entity": "Catalog_X", "data": {}})
     assert body(result)["outcome"] == "not_sent"
 
 
@@ -145,10 +140,10 @@ async def test_failed_discovery_is_not_cached(
     app = Starlette(routes=[Route(f"{BASE}/$metadata", flaky_metadata, methods=["GET"])])
     async with serving(app) as url:
         ONEC_CASE.point_at_backend(monkeypatch, url, tmp_path)
-        first = await _call(ONEC_CASE, "onec_list_entities", {})
+        first = await call_tool(ONEC_CASE, "onec_list_entities", {})
         assert first.isError is True
         up = True
-        second = await _call(ONEC_CASE, "onec_list_entities", {})
+        second = await call_tool(ONEC_CASE, "onec_list_entities", {})
 
     assert second.isError is False
     block = second.content[0]
