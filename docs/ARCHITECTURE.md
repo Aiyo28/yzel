@@ -6,6 +6,9 @@
 src/yzel/
 ├── cli.py               # yzel CLI — config add-*, list, remove
 ├── core/
+│   ├── tools.py         # Tool kinds, MCP annotations, read-only mode (YZEL_READ_ONLY)
+│   ├── outcome.py       # Result envelope: write outcomes, error_result, json_text
+│   ├── writes.py        # Write runner (run_write) and duplicate-create guard
 │   ├── types.py         # ServiceCredential + 8 subclasses + EntityRecord + SchemaEntity
 │   ├── vault.py         # SQLite vault, AES-256 at rest, ~/.yzel/store.db
 │   └── discovery.py     # Dynamic schema discovery (1C $metadata streaming parser)
@@ -95,7 +98,7 @@ First connection of each service type is selected automatically. Multi-tenant / 
 
 ## Testing
 
-- 137 unit tests, all against in-process httpx mocks (`tests/mock_<service>_server.py`).
+- Unit tests, all against in-process httpx mocks (`tests/mock_<service>_server.py`).
 - Each mock mirrors the real API's auth, error shapes, and quirks (e.g., Bitrix24 2 rps, Ozon dual-header, AmoCRM refresh semantics).
 - Mocks are evaluator-useful for regression but do not substitute for live smoke tests against real accounts.
 

@@ -1,6 +1,6 @@
 # Spec: write safety and retry safety for Yzel's 22 write tools
 
-Status: draft, not built · 2026-11-09 · source: crossbar comparison (`github.com/prantikmedhi/crossbar`, `src/mcp.mjs`)
+Status: built for slices 1-4; slice 5 (release + live check) pending · 2026-11-09 · source: crossbar comparison (`github.com/prantikmedhi/crossbar`, `src/mcp.mjs`)
 
 ## Problem Statement
 
@@ -220,4 +220,11 @@ mode mutated real state because its guard was a prompt instruction".
 - Annotations are hints; the MCP spec tells clients not to trust them from untrusted servers.
   They improve the prompt; they are not the safety guarantee. `call_tool` refusal and the write
   outcomes are.
+- Known gaps, accepted:
+  - Identical creates sent in one parallel tool batch can both pass the guard; sequential
+    retries are caught.
+  - A timeout while fetching a token (iiko `access_token`, AmoCRM refresh) counts as
+    `may_have_applied` and is guarded, though nothing was written: one extra check for the agent.
+  - Unverified: some APIs (e.g. Ozon price/stock imports) report per-item failures inside a 2xx;
+    that comes back as `applied`.
 - Builder: 4 AFK slices, not a single chain → `/implement-spec`.

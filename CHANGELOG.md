@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Tool kinds and MCP annotations.** Every tool is read, create, update or delete, and says so
+  to the client (`readOnlyHint`, `destructiveHint`, `idempotentHint`), so clients can prompt for
+  writes and not for reads.
+- **Read-only mode.** `YZEL_READ_ONLY=1` hides every write tool and refuses a call to one
+  (`refused`). The 1C extension has a «Только чтение» checkbox, on by default.
+- **Write outcomes.** Each of the 22 write tools answers with JSON: `applied`, `rejected`,
+  `not_sent`, `may_have_applied`, `duplicate_refused` or `refused`, with `isError` set for all but
+  `applied`. A timeout after the request left is `may_have_applied`, not an empty error.
+- **Duplicate guard.** An identical create is refused for 10 minutes after one that applied or
+  may have; `again: true` overrides it after checking.
+
+### Fixed
+- **A typed backend error was returned as a successful result.** Reads now set `isError`; the
+  unknown-tool fall-through too.
+- **The first 1C write of a session could end without an outcome** when `$metadata` was down:
+  the schema is fetched only by `onec_list_entities` and `onec_schema`, and a failed fetch is
+  retried on the next call.
+
 ## [0.1.4] — 2026-10-29
 
 ### Added

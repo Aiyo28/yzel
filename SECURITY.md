@@ -20,10 +20,11 @@ Treat any credential-handling bug as high severity.
 - **No telemetry.** Yzel makes no network call other than to the service you configured.
 - **`~/.yzel/vault.key` is a plaintext key file.** If an attacker has your home directory they
   have your credentials. Set `YZEL_KEY` from your own secret manager if that matters to you.
-- **21 of the 68 MCP tools mutate remote state** (see `docs/LIVE-CHECKS.md`). An agent with a
+- **22 of the 68 MCP tools mutate remote state** (see `docs/LIVE-CHECKS.md`). An agent with a
   yzel connector attached can create, update and delete records in your production systems.
   Scope the API keys you give it accordingly — most services support read-only tokens, and
-  Wildberries and Ozon both have sandbox modes.
+  Wildberries and Ozon both have sandbox modes. `YZEL_READ_ONLY=1` (in the 1C `.mcpb`, the
+  «Только чтение» checkbox) hides every write tool and refuses a call to one, in code.
 
 ## Supported versions
 

@@ -1,6 +1,6 @@
 # Live checks — the repeatable protocol
 
-Companion to `docs/TESTING.md`. That document explains why the 138 unit tests cannot catch API
+Companion to `docs/TESTING.md`. That document explains why the unit tests cannot catch API
 drift; this one is the thing you actually re-run.
 
 **Cadence: before every release, and quarterly regardless.** Vendors change seller APIs without
@@ -12,9 +12,9 @@ Every run appends a row to the log at the bottom. A run with no log row did not 
 
 ## Safety rules — read these before the first check
 
-1. **Read-only probes first, always.** 47 of the 68 tools are read-only. A connector that fails
+1. **Read-only probes first, always.** 46 of the 68 tools are read-only. A connector that fails
    its read probes is not ready to be write-tested.
-2. **Never run a mutating tool against a production tenant.** The 21 mutating tools are listed
+2. **Never run a mutating tool against a production tenant.** The 22 mutating tools are listed
    per connector below. `ozon_update_prices` against a live seller account changes real prices;
    `wb_update_stocks` changes real stock; `tg_set_webhook` silently breaks whatever integration
    that bot already had.
@@ -70,9 +70,10 @@ against a live 1C:Fresh endpoint once; the data plane never was.
 
 ### Telegram — `yzel config add-telegram` (throwaway bot)
 
-- [ ] `tg_get_me` · `tg_get_chat` · `tg_get_webhook_info` · `tg_get_updates`
-- Mutating (8 tools — `tg_send_*`, `tg_edit_message`, `tg_delete_message`, `tg_set_webhook`,
-  `tg_delete_webhook`, `tg_answer_callback`): throwaway bot only. **`tg_set_webhook` on a bot
+- [ ] `tg_get_me` · `tg_get_chat` · `tg_get_webhook_info`
+- Mutating (9 tools — `tg_send_*`, `tg_edit_message`, `tg_delete_message`, `tg_set_webhook`,
+  `tg_delete_webhook`, `tg_answer_callback`, `tg_get_updates`: with `offset` it confirms updates
+  and Telegram drops them): throwaway bot only. **`tg_set_webhook` on a bot
   already in use silently hijacks its updates** — check `tg_get_webhook_info` first and restore
   what you found.
 

@@ -49,7 +49,7 @@ vault; there is no interactive prompt over stdio.
 
 `yzel config list` shows configured connections; `yzel config remove <id>` deletes one.
 
-## Tools — 68 total, 47 read-only, 21 mutating
+## Tools — 68 total, 46 read-only, 22 mutating
 
 **1C (8)** — `onec_list_entities` `onec_schema` `onec_query` `onec_get` `onec_count` ·
 mutating: `onec_create` `onec_update` `onec_delete`
@@ -62,9 +62,10 @@ mutating: `onec_create` `onec_update` `onec_delete`
 `wb_new_orders` `wb_order_stats` `wb_sales` `wb_get_prices` `wb_get_stocks` ·
 mutating: `wb_update_stocks`
 
-**Telegram (12)** — `tg_get_me` `tg_get_chat` `tg_get_updates` `tg_get_webhook_info` ·
+**Telegram (12)** — `tg_get_me` `tg_get_chat` `tg_get_webhook_info` ·
 mutating: `tg_send_message` `tg_send_photo` `tg_send_document` `tg_edit_message`
-`tg_delete_message` `tg_set_webhook` `tg_delete_webhook` `tg_answer_callback`
+`tg_delete_message` `tg_set_webhook` `tg_delete_webhook` `tg_answer_callback` `tg_get_updates`
+(with `offset` it confirms updates and Telegram drops them)
 
 **iiko (9)** — `iiko_organizations` `iiko_terminal_groups` `iiko_nomenclature` `iiko_stop_list`
 `iiko_order_types` `iiko_payment_types` `iiko_employees` `iiko_deliveries_by_phone` ·
@@ -81,14 +82,18 @@ mutating: `moysklad_create` `moysklad_update`
 
 ## Rules that matter
 
-- **The 21 mutating tools act on production business systems.** `ozon_update_prices` changes
+- **The 22 mutating tools act on production business systems.** `ozon_update_prices` changes
   live prices; `tg_set_webhook` silently takes over a bot's updates. Confirm with the user before
   calling any of them, and never call one to "test" a connection.
 - **1C: start with `onec_schema`.** Entity names are Cyrillic and come from the infobase, not
   from a fixed list. An empty schema raises `EmptySchemaError` — it means the infobase has no
   OData-published objects, not that the connection failed. See `docs/TROUBLESHOOTING-1C.md`.
 - **Wildberries and Ozon have sandbox modes.** Prefer them for anything that writes.
-- Errors come back as readable Russian text (`Ошибка 1С: …`), not exceptions.
+- Reads return data or an `isError` Russian error (`Ошибка 1С: …`). Every write returns JSON with
+  `outcome` (`applied` / `rejected` / `not_sent` / `may_have_applied` / `duplicate_refused` /
+  `refused`) and `isError`. On `may_have_applied` for a create, do not resend: check first.
+  `duplicate_refused` needs `again: true`, and only after checking the first one is not there.
+- `YZEL_READ_ONLY=1` hides every mutating tool and refuses a call to one (`refused`).
 
 ## Not supported
 

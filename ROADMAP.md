@@ -13,7 +13,14 @@
 | Telegram Bot | 12 MCP tools, `retry_after` handling, self-hosted Bot API support |
 | iiko Cloud | `apiLogin` → 1h Bearer auto-refresh on 401, 9 MCP tools (organizations, terminal groups, nomenclature, deliveries, etc.) |
 
-146 tests across all connectors. 1C also ships as a Claude Desktop Extension (`.mcpb`, `extensions/1c/`).
+1C also ships as a Claude Desktop Extension (`.mcpb`, `extensions/1c/`).
+
+## Write safety — built, release pending
+
+Tool kinds with MCP annotations, `YZEL_READ_ONLY` (and the 1C `.mcpb` «Только чтение» checkbox), write
+outcomes and a duplicate-create guard for all 22 write tools, `isError` on typed errors. Built on
+the integration branch (spec: `docs/specs/write-safety.md`); release and the live check in Claude
+Desktop are still to do.
 
 ## v0.2 — Next
 

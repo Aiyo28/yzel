@@ -64,6 +64,7 @@ Yzel подключает Claude, ChatGPT и других AI-ассистент�
 1. Скачайте `yzel-1c-<версия>.mcpb` со страницы [последнего релиза](https://github.com/Aiyo28/yzel/releases/latest) / Download the `.mcpb` from the latest release.
 2. Откройте файл двойным щелчком — Claude Desktop покажет окно установки / Double-click it; Claude Desktop opens an install dialog.
 3. Введите адрес OData, пользователя и пароль 1С / Enter the OData URL, 1C user and password.
+4. Флажок «Только чтение» включён по умолчанию: Claude видит только инструменты чтения. Снимите его, чтобы разрешить запись / The «Только чтение» (read-only) checkbox is on by default: Claude sees only the read tools. Untick it to allow writes.
 
 Python и зависимости Claude Desktop ставит сам; терминал не нужен. Пароль хранится в настройках
 Claude Desktop и уходит только на ваш сервер 1С. Остальные коннекторы пока ставятся через `uvx`
@@ -130,6 +131,8 @@ yzel config list
 Для 1С вместо vault можно задать переменные окружения — они имеют приоритет / For 1C, env vars
 can replace the vault and take precedence: `YZEL_1C_URL`, `YZEL_1C_USERNAME`, `YZEL_1C_PASSWORD`
 (пароль может быть пустым / the password may be empty).
+
+Чтобы скрыть и запретить все инструменты записи, задайте `YZEL_READ_ONLY=1` / To hide and refuse every write tool, set `YZEL_READ_ONLY=1`.
 
 ### 2. Подключите к Claude Desktop / Wire into Claude Desktop
 
@@ -243,7 +246,7 @@ uv run python -m yzel.connectors.iiko.server
 - **Basic Auth без токен-сессий.** В 1С нет refresh-потока — каждый запрос отправляет base64(user:pass). Yzel не изобретает несуществующую token-refresh логику.
 - **Без BSL-расширений.** Yzel подключается к опубликованным OData/HTTP API. Никаких модификаций конфигурации 1С не требуется.
 
-Тестирование: 146 unit-тестов против mock-серверов. Транспорт + `$metadata` parsing подтверждены на живом 1С:Fresh endpoint. Полное data-plane тестирование против реального 1С требует инфобазы с опубликованными через OData объектами (on-prem или платный Fresh-тенант с правами администратора) — см. [`docs/TROUBLESHOOTING-1C.md`](docs/TROUBLESHOOTING-1C.md) если получаете `EmptySchemaError`.
+Тестирование: unit-тесты против mock-серверов. Транспорт + `$metadata` parsing подтверждены на живом 1С:Fresh endpoint. Полное data-plane тестирование против реального 1С требует инфобазы с опубликованными через OData объектами (on-prem или платный Fresh-тенант с правами администратора) — см. [`docs/TROUBLESHOOTING-1C.md`](docs/TROUBLESHOOTING-1C.md) если получаете `EmptySchemaError`.
 
 ---
 
