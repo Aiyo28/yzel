@@ -17,7 +17,7 @@ uv run pytest -q
 no `pythonpath` in `[tool.pytest.ini_options]`, so the project must be installed into the venv
 before the suite can import `yzel`. Getting this wrong is a contributor's first five minutes.
 
-Expected: `138 passed` in ~40s. `ruff`, `ruff format --check` and `mypy --strict` are also
+Expected: all tests pass, in under a minute. `ruff`, `ruff format --check` and `mypy --strict` are also
 clean and gated in CI.
 
 ## The three layers
