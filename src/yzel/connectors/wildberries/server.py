@@ -192,7 +192,7 @@ TOOLS: list[Tool] = [
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    """List Wildberries Seller tools."""
+    """List available Wildberries Seller tools (only the read ones in read-only mode)."""
     return visible_tools(TOOLS)
 
 

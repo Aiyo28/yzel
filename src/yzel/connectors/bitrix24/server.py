@@ -247,7 +247,7 @@ TOOLS: list[Tool] = [
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    """List available Bitrix24 tools."""
+    """List available Bitrix24 tools (only the read ones in read-only mode)."""
     return visible_tools(TOOLS)
 
 

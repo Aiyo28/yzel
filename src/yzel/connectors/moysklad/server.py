@@ -96,7 +96,7 @@ TOOLS: list[Tool] = [
                 },
                 "limit": {
                     "type": "integer",
-                    "description": ("Максимальное количество записей (по умолчанию 25, макс 1000)"),
+                    "description": "Максимальное количество записей (по умолчанию 25, макс 1000)",
                     "default": 25,
                 },
                 "offset": {
@@ -238,7 +238,7 @@ TOOLS: list[Tool] = [
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    """List available Moysklad tools."""
+    """List available Moysklad tools (only the read ones in read-only mode)."""
     return visible_tools(TOOLS)
 
 

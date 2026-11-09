@@ -249,7 +249,7 @@ TOOLS: list[Tool] = [
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    """List available AmoCRM tools."""
+    """List available AmoCRM tools (only the read ones in read-only mode)."""
     return visible_tools(TOOLS)
 
 

@@ -150,7 +150,7 @@ TOOLS: list[Tool] = [
     ),
     make_tool(
         name="tg_get_updates",
-        description=("Получить обновления (long-polling). Не использовать одновременно с webhook"),
+        description="Получить обновления (long-polling). Не использовать одновременно с webhook",
         input_schema={
             "type": "object",
             "properties": {
