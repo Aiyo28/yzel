@@ -1,36 +1,40 @@
-"""1C write tools end to end: real httpx client, real timeout, mock 1C that commits then stalls."""
+"""1C write tools end to end: real httpx client, real timeout, mock 1C that commits then stalls.
+
+Servers start cold (`_client = None`, connection from env), like a fresh process: the first
+write of a session must end in an outcome even when `$metadata` is down.
+"""
 
 from __future__ import annotations
 
 import asyncio
-import json
-from collections.abc import AsyncGenerator
+from pathlib import Path
 from typing import Any
 
 import pytest
-import uvicorn
+from mcp.types import CallToolResult, TextContent
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
+from tests.connector_cases import SERVERS, ServerCase, connected
+from tests.harness import CLIENT_TIMEOUT, STALL_SECONDS, body, serving
 from yzel.connectors.onec import server as onec
 from yzel.connectors.onec.odata import OneCODataClient
 from yzel.core import writes
 
-PORT = 8184
-BASE = f"http://127.0.0.1:{PORT}/odata"
-STALL_SECONDS = 0.8
-CLIENT_TIMEOUT = 0.2
-
-created: list[dict[str, Any]] = []
+ONEC_CASE = next(c for c in SERVERS if c.id == "onec")
+BASE = "/odata/standard.odata"
+ARGS = {"entity": "Catalog_Slow", "data": {"Description": "ООО Ромашка"}}
 
 
-async def _create_slow(request: Request) -> JSONResponse:
-    """Commits the record, then answers after the client has given up."""
-    created.append(await request.json())
-    await asyncio.sleep(STALL_SECONDS)
-    return JSONResponse({"Ref_Key": "new"}, status_code=201)
+@pytest.fixture(autouse=True)
+def _fresh_guard() -> None:
+    writes.reset_guard()
+
+
+async def _metadata_down(request: Request) -> Response:
+    return Response("Service Unavailable", status_code=503)
 
 
 async def _bad_request(request: Request) -> JSONResponse:
@@ -40,70 +44,113 @@ async def _bad_request(request: Request) -> JSONResponse:
     )
 
 
-mock = Starlette(
-    routes=[
-        Route("/odata/Catalog_Slow", _create_slow, methods=["POST"]),
-        Route("/odata/Catalog_Bad", _bad_request, methods=["POST", "GET"]),
-    ]
-)
+async def _call(case: ServerCase, name: str, arguments: dict[str, Any]) -> CallToolResult:
+    async with connected(case) as session:
+        return await session.call_tool(name, arguments)
 
 
-@pytest.fixture
-async def one_c() -> AsyncGenerator[None, None]:
-    server = uvicorn.Server(uvicorn.Config(mock, host="127.0.0.1", port=PORT, log_level="error"))
-    task = asyncio.create_task(server.serve())
-    for _ in range(50):
-        if server.started:
-            break
-        await asyncio.sleep(0.05)
-    created.clear()
-    writes.reset_guard()
-    onec._client = OneCODataClient(BASE, "admin", "test", timeout=CLIENT_TIMEOUT)
-    onec._schema = []
-    yield
-    onec._client = None
-    server.should_exit = True
-    await task
+async def test_timeout_after_commit_blocks_the_identical_resend(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    created: list[dict[str, Any]] = []
+
+    async def create_slow(request: Request) -> JSONResponse:
+        """Commits the record, then answers after the client has given up."""
+        created.append(await request.json())
+        await asyncio.sleep(STALL_SECONDS)
+        return JSONResponse({"Ref_Key": "new"}, status_code=201)
+
+    app = Starlette(routes=[Route(f"{BASE}/Catalog_Slow", create_slow, methods=["POST"])])
+    async with serving(app) as url:
+        ONEC_CASE.point_at_backend(monkeypatch, url, tmp_path)
+        # The server builds its own client from env; inject a short timeout to provoke the stall.
+        monkeypatch.setattr(
+            onec,
+            "OneCODataClient",
+            lambda *a, **k: OneCODataClient(*a, **k, timeout=CLIENT_TIMEOUT),
+        )
+
+        first = await _call(ONEC_CASE, "onec_create", dict(ARGS))
+        assert first.isError is True
+        assert body(first)["outcome"] == "may_have_applied"
+        assert body(first)["resend_safe"] is False
+        assert "onec_query" in body(first)["message"]
+        assert len(created) == 1  # 1C committed it
+
+        second = await _call(ONEC_CASE, "onec_create", dict(ARGS))
+        assert body(second)["outcome"] == "duplicate_refused"
+        assert len(created) == 1  # the mock never saw a second request
+
+        third = await _call(ONEC_CASE, "onec_create", {**ARGS, "again": True})
+        assert body(third)["outcome"] == "may_have_applied"
+        assert len(created) == 2
 
 
-def body(result: Any) -> dict[str, Any]:
-    parsed: dict[str, Any] = json.loads(result.content[0].text)
-    return parsed
+async def test_1c_400_on_create_is_rejected_with_the_reason(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    app = Starlette(routes=[Route(f"{BASE}/Catalog_Bad", _bad_request, methods=["POST"])])
+    async with serving(app) as url:
+        ONEC_CASE.point_at_backend(monkeypatch, url, tmp_path)
+        result = await _call(ONEC_CASE, "onec_create", {"entity": "Catalog_Bad", "data": {}})
 
-
-async def test_timeout_after_commit_blocks_the_identical_resend(one_c: None) -> None:
-    args = {"entity": "Catalog_Slow", "data": {"Description": "ООО Ромашка"}}
-
-    first = await onec.call_tool("onec_create", dict(args))
-    assert first.isError is True
-    assert body(first)["outcome"] == "may_have_applied"
-    assert body(first)["resend_safe"] is False
-    assert "onec_query" in body(first)["message"]
-    assert len(created) == 1  # 1C committed it
-
-    second = await onec.call_tool("onec_create", dict(args))
-    assert body(second)["outcome"] == "duplicate_refused"
-    assert len(created) == 1  # the mock never saw a second request
-
-    third = await onec.call_tool("onec_create", {**args, "again": True})
-    assert body(third)["outcome"] == "may_have_applied"
-    assert len(created) == 2
-
-
-async def test_1c_400_on_create_is_rejected_with_the_reason(one_c: None) -> None:
-    result = await onec.call_tool("onec_create", {"entity": "Catalog_Bad", "data": {}})
     assert result.isError is True
     assert body(result)["outcome"] == "rejected"
     assert "Не заполнено ИНН" in body(result)["message"]
 
 
-async def test_connection_refused_is_not_sent(one_c: None) -> None:
-    onec._client = OneCODataClient("http://127.0.0.1:1/odata", "a", "b", timeout=CLIENT_TIMEOUT)
-    result = await onec.call_tool("onec_create", {"entity": "Catalog_X", "data": {}})
+@pytest.mark.parametrize("entity_route", [_bad_request, None], ids=["400", "created"])
+async def test_first_write_of_a_session_ends_in_an_outcome_when_metadata_is_down(
+    entity_route: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    async def created(request: Request) -> JSONResponse:
+        return JSONResponse({"Ref_Key": "new"}, status_code=201)
+
+    app = Starlette(
+        routes=[
+            Route(f"{BASE}/$metadata", _metadata_down, methods=["GET"]),
+            Route(f"{BASE}/Catalog_X", entity_route or created, methods=["POST"]),
+        ]
+    )
+    async with serving(app) as url:
+        ONEC_CASE.point_at_backend(monkeypatch, url, tmp_path)
+        result = await _call(ONEC_CASE, "onec_create", {"entity": "Catalog_X", "data": {}})
+
+    assert body(result)["outcome"] == ("rejected" if entity_route else "applied")
+
+
+async def test_cold_server_with_refused_connection_is_not_sent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    ONEC_CASE.point_at_backend(monkeypatch, "http://127.0.0.1:1", tmp_path)
+    result = await _call(ONEC_CASE, "onec_create", {"entity": "Catalog_X", "data": {}})
     assert body(result)["outcome"] == "not_sent"
 
 
-async def test_read_tool_1c_error_is_an_error_result(one_c: None) -> None:
-    result = await onec.call_tool("onec_query", {"entity": "Catalog_Bad"})
-    assert result.isError is True
-    assert "Не заполнено ИНН" in result.content[0].text
+async def test_failed_discovery_is_not_cached(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`onec_list_entities` needs `$metadata`; a 503 now must not poison the next call."""
+    metadata = (
+        '<edmx:Edmx xmlns:edmx="http://schemas.microsoft.com/ado/2007/06/edmx">'
+        '<Schema xmlns="http://schemas.microsoft.com/ado/2009/11/edm">'
+        '<EntityType Name="Catalog_Контрагенты"><Property Name="Ref_Key" Type="Edm.Guid"/>'
+        "</EntityType></Schema></edmx:Edmx>"
+    )
+    up = False
+
+    async def flaky_metadata(request: Request) -> Response:
+        return Response(metadata if up else "down", status_code=200 if up else 503)
+
+    app = Starlette(routes=[Route(f"{BASE}/$metadata", flaky_metadata, methods=["GET"])])
+    async with serving(app) as url:
+        ONEC_CASE.point_at_backend(monkeypatch, url, tmp_path)
+        first = await _call(ONEC_CASE, "onec_list_entities", {})
+        assert first.isError is True
+        up = True
+        second = await _call(ONEC_CASE, "onec_list_entities", {})
+
+    assert second.isError is False
+    block = second.content[0]
+    assert isinstance(block, TextContent)
+    assert "Catalog_Контрагенты" in block.text

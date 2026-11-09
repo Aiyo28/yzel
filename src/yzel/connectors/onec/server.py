@@ -31,6 +31,7 @@ server = Server("yzel-1c", version=__version__)
 # Runtime state
 _client: OneCODataClient | None = None
 _schema: list[SchemaEntity] = []
+_cred: OneCCredential | None = None
 _connection_id: str | None = None
 
 
@@ -75,18 +76,32 @@ def _credential_from_vault() -> OneCCredential:
     return cred
 
 
+def _credential() -> OneCCredential:
+    global _cred
+    if _cred is None:
+        _cred = _credential_from_env() or _credential_from_vault()
+    return _cred
+
+
 async def _ensure_client() -> OneCODataClient:
-    global _client, _schema
-
-    if _client is not None:
-        return _client
-
-    cred = _credential_from_env() or _credential_from_vault()
-
-    _client = OneCODataClient(cred.host, cred.username, cred.password)
-    _schema = await discover_schema(cred.host, cred.username, cred.password)
-
+    """The OData client, built on first use. No network call: `$metadata` must not block writes."""
+    global _client
+    if _client is None:
+        cred = _credential()
+        _client = OneCODataClient(cred.host, cred.username, cred.password)
     return _client
+
+
+async def _ensure_schema() -> list[SchemaEntity]:
+    """The `$metadata` schema, fetched on first use by the tools that read it.
+
+    A failed fetch raises and caches nothing, so the next call retries.
+    """
+    global _schema
+    if not _schema:
+        cred = _credential()
+        _schema = await discover_schema(cred.host, cred.username, cred.password)
+    return _schema
 
 
 TOOLS: list[Tool] = [
@@ -242,7 +257,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
         client = await _ensure_client()
 
         if name == "onec_list_entities":
-            return _as_text([e.entity_name for e in _schema])
+            return _as_text([e.entity_name for e in await _ensure_schema()])
 
         if name == "onec_query":
             results = await client.get_entity_list(
@@ -261,7 +276,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
 
         if name == "onec_schema":
             entity_name = arguments["entity"]
-            matching = [e for e in _schema if e.entity_name == entity_name]
+            matching = [e for e in await _ensure_schema() if e.entity_name == entity_name]
             if not matching:
                 return [
                     TextContent(type="text", text=f"Объект '{entity_name}' не найден в метаданных")

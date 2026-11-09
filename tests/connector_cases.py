@@ -26,7 +26,6 @@ from yzel.connectors.iiko import server as iiko_server
 from yzel.connectors.moysklad import server as moysklad_server
 from yzel.connectors.moysklad.client import MoyskladClient
 from yzel.connectors.onec import server as onec_server
-from yzel.connectors.onec.odata import OneCODataClient
 from yzel.connectors.ozon import server as ozon_server
 from yzel.connectors.telegram import server as telegram_server
 from yzel.connectors.wildberries import client as wildberries_client
@@ -71,11 +70,11 @@ def _seed_vault(mp: pytest.MonkeyPatch, home: Path, credential: ServiceCredentia
 
 
 def _point_onec(mp: pytest.MonkeyPatch, url: str, home: Path) -> None:
-    # Hand the server a ready client: a cold start runs schema discovery first, and a failing
-    # `$metadata` would end the call before the tool under test is reached.
-    mp.setattr(
-        onec_server, "_client", OneCODataClient(f"{url}/odata/standard.odata", "admin", "test")
-    )
+    mp.setenv("YZEL_1C_URL", f"{url}/odata/standard.odata")
+    mp.setenv("YZEL_1C_USERNAME", "admin")
+    mp.setenv("YZEL_1C_PASSWORD", "test")
+    mp.setattr(onec_server, "_client", None)
+    mp.setattr(onec_server, "_cred", None)
     mp.setattr(onec_server, "_schema", [])
 
 
