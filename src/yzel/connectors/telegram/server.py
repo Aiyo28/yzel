@@ -11,9 +11,11 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
+from yzel.core.outcome import error_result
+from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import TelegramCredential
 from yzel.core.vault import CredentialVault
 
@@ -50,149 +52,163 @@ async def _ensure_client() -> TelegramClient:
     return _client
 
 
+TOOLS: list[Tool] = [
+    make_tool(
+        name="tg_get_me",
+        description="Данные бота Telegram",
+        input_schema={"type": "object", "properties": {}},
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="tg_send_message",
+        description="Отправить текстовое сообщение в чат",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "chat_id": {"type": ["integer", "string"]},
+                "text": {"type": "string"},
+                "parse_mode": {"type": "string", "description": "HTML | MarkdownV2"},
+                "reply_to_message_id": {"type": "integer"},
+                "reply_markup": {"type": "object"},
+                "disable_web_page_preview": {"type": "boolean"},
+            },
+            "required": ["chat_id", "text"],
+        },
+        kind=ToolKind.CREATE,
+    ),
+    make_tool(
+        name="tg_send_photo",
+        description="Отправить фото (URL или file_id)",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "chat_id": {"type": ["integer", "string"]},
+                "photo": {"type": "string"},
+                "caption": {"type": "string"},
+                "parse_mode": {"type": "string"},
+            },
+            "required": ["chat_id", "photo"],
+        },
+        kind=ToolKind.CREATE,
+    ),
+    make_tool(
+        name="tg_send_document",
+        description="Отправить документ (URL или file_id)",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "chat_id": {"type": ["integer", "string"]},
+                "document": {"type": "string"},
+                "caption": {"type": "string"},
+                "parse_mode": {"type": "string"},
+            },
+            "required": ["chat_id", "document"],
+        },
+        kind=ToolKind.CREATE,
+    ),
+    make_tool(
+        name="tg_edit_message",
+        description="Отредактировать текст ранее отправленного сообщения",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "chat_id": {"type": ["integer", "string"]},
+                "message_id": {"type": "integer"},
+                "text": {"type": "string"},
+                "parse_mode": {"type": "string"},
+            },
+            "required": ["chat_id", "message_id", "text"],
+        },
+        kind=ToolKind.UPDATE,
+    ),
+    make_tool(
+        name="tg_delete_message",
+        description="Удалить сообщение",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "chat_id": {"type": ["integer", "string"]},
+                "message_id": {"type": "integer"},
+            },
+            "required": ["chat_id", "message_id"],
+        },
+        kind=ToolKind.DELETE,
+    ),
+    make_tool(
+        name="tg_answer_callback",
+        description="Ответить на нажатие inline-кнопки",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "callback_query_id": {"type": "string"},
+                "text": {"type": "string"},
+                "show_alert": {"type": "boolean", "default": False},
+            },
+            "required": ["callback_query_id"],
+        },
+        kind=ToolKind.CREATE,
+    ),
+    make_tool(
+        name="tg_get_updates",
+        description=("Получить обновления (long-polling). Не использовать одновременно с webhook"),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "offset": {"type": "integer"},
+                "limit": {"type": "integer", "default": 100},
+                "timeout": {"type": "integer", "default": 0},
+                "allowed_updates": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+        kind=ToolKind.UPDATE,
+    ),
+    make_tool(
+        name="tg_set_webhook",
+        description="Установить webhook URL (отключает long-polling)",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "url": {"type": "string"},
+                "secret_token": {"type": "string"},
+                "allowed_updates": {"type": "array", "items": {"type": "string"}},
+                "drop_pending_updates": {"type": "boolean", "default": False},
+            },
+            "required": ["url"],
+        },
+        kind=ToolKind.UPDATE,
+    ),
+    make_tool(
+        name="tg_delete_webhook",
+        description="Удалить webhook",
+        input_schema={
+            "type": "object",
+            "properties": {"drop_pending_updates": {"type": "boolean", "default": False}},
+        },
+        kind=ToolKind.DELETE,
+    ),
+    make_tool(
+        name="tg_get_webhook_info",
+        description="Информация о текущем webhook",
+        input_schema={"type": "object", "properties": {}},
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="tg_get_chat",
+        description="Данные чата",
+        input_schema={
+            "type": "object",
+            "properties": {"chat_id": {"type": ["integer", "string"]}},
+            "required": ["chat_id"],
+        },
+        kind=ToolKind.READ,
+    ),
+]
+
+
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    return [
-        Tool(
-            name="tg_get_me",
-            description="Данные бота Telegram",
-            inputSchema={"type": "object", "properties": {}},
-        ),
-        Tool(
-            name="tg_send_message",
-            description="Отправить текстовое сообщение в чат",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "chat_id": {"type": ["integer", "string"]},
-                    "text": {"type": "string"},
-                    "parse_mode": {"type": "string", "description": "HTML | MarkdownV2"},
-                    "reply_to_message_id": {"type": "integer"},
-                    "reply_markup": {"type": "object"},
-                    "disable_web_page_preview": {"type": "boolean"},
-                },
-                "required": ["chat_id", "text"],
-            },
-        ),
-        Tool(
-            name="tg_send_photo",
-            description="Отправить фото (URL или file_id)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "chat_id": {"type": ["integer", "string"]},
-                    "photo": {"type": "string"},
-                    "caption": {"type": "string"},
-                    "parse_mode": {"type": "string"},
-                },
-                "required": ["chat_id", "photo"],
-            },
-        ),
-        Tool(
-            name="tg_send_document",
-            description="Отправить документ (URL или file_id)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "chat_id": {"type": ["integer", "string"]},
-                    "document": {"type": "string"},
-                    "caption": {"type": "string"},
-                    "parse_mode": {"type": "string"},
-                },
-                "required": ["chat_id", "document"],
-            },
-        ),
-        Tool(
-            name="tg_edit_message",
-            description="Отредактировать текст ранее отправленного сообщения",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "chat_id": {"type": ["integer", "string"]},
-                    "message_id": {"type": "integer"},
-                    "text": {"type": "string"},
-                    "parse_mode": {"type": "string"},
-                },
-                "required": ["chat_id", "message_id", "text"],
-            },
-        ),
-        Tool(
-            name="tg_delete_message",
-            description="Удалить сообщение",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "chat_id": {"type": ["integer", "string"]},
-                    "message_id": {"type": "integer"},
-                },
-                "required": ["chat_id", "message_id"],
-            },
-        ),
-        Tool(
-            name="tg_answer_callback",
-            description="Ответить на нажатие inline-кнопки",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "callback_query_id": {"type": "string"},
-                    "text": {"type": "string"},
-                    "show_alert": {"type": "boolean", "default": False},
-                },
-                "required": ["callback_query_id"],
-            },
-        ),
-        Tool(
-            name="tg_get_updates",
-            description=(
-                "Получить обновления (long-polling). Не использовать одновременно с webhook"
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "offset": {"type": "integer"},
-                    "limit": {"type": "integer", "default": 100},
-                    "timeout": {"type": "integer", "default": 0},
-                    "allowed_updates": {"type": "array", "items": {"type": "string"}},
-                },
-            },
-        ),
-        Tool(
-            name="tg_set_webhook",
-            description="Установить webhook URL (отключает long-polling)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "url": {"type": "string"},
-                    "secret_token": {"type": "string"},
-                    "allowed_updates": {"type": "array", "items": {"type": "string"}},
-                    "drop_pending_updates": {"type": "boolean", "default": False},
-                },
-                "required": ["url"],
-            },
-        ),
-        Tool(
-            name="tg_delete_webhook",
-            description="Удалить webhook",
-            inputSchema={
-                "type": "object",
-                "properties": {"drop_pending_updates": {"type": "boolean", "default": False}},
-            },
-        ),
-        Tool(
-            name="tg_get_webhook_info",
-            description="Информация о текущем webhook",
-            inputSchema={"type": "object", "properties": {}},
-        ),
-        Tool(
-            name="tg_get_chat",
-            description="Данные чата",
-            inputSchema={
-                "type": "object",
-                "properties": {"chat_id": {"type": ["integer", "string"]}},
-                "required": ["chat_id"],
-            },
-        ),
-    ]
+    """List available tools (only the read ones in read-only mode)."""
+    return visible_tools(TOOLS)
 
 
 def _as_text(payload: Any) -> list[TextContent]:
@@ -200,7 +216,10 @@ def _as_text(payload: Any) -> list[TextContent]:
 
 
 @server.call_tool()
-async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] | CallToolResult:
+    # First, before any client or credential is touched: hiding tools in list_tools is not enough.
+    if (refused := refuse_if_read_only(TOOLS, name)) is not None:
+        return refused
     try:
         client = await _ensure_client()
 
@@ -294,7 +313,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
     except TelegramError as exc:
         hint = f" — подождите {exc.retry_after}с" if exc.retry_after else ""
-        return [TextContent(type="text", text=f"Ошибка Telegram: {exc.description}{hint}")]
+        return error_result(f"Ошибка Telegram: {exc.description}{hint}")
 
 
 async def main() -> None:

@@ -12,9 +12,10 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
+from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import AmoCRMCredential
 from yzel.core.vault import CredentialVault
 
@@ -103,149 +104,161 @@ _ENTITY_TYPES = {
 }
 
 
+TOOLS: list[Tool] = [
+    make_tool(
+        name="amocrm_list",
+        description=(
+            "Получить список сущностей из AmoCRM (сделки, контакты, компании). "
+            "Поддерживает поиск, фильтрацию и связанные данные (with)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "entity": {
+                    "type": "string",
+                    "enum": ["lead", "contact", "company"],
+                    "description": "Тип сущности",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Записей на странице (макс 250)",
+                    "default": 50,
+                },
+                "page": {
+                    "type": "integer",
+                    "description": "Номер страницы",
+                    "default": 1,
+                },
+                "query": {
+                    "type": "string",
+                    "description": "Поисковый запрос",
+                },
+                "with": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Связанные данные (например, ['contacts', 'catalog_elements'])"
+                    ),
+                },
+            },
+            "required": ["entity"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="amocrm_get",
+        description="Получить одну сущность из AmoCRM по ID",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "entity": {
+                    "type": "string",
+                    "enum": ["lead", "contact", "company"],
+                    "description": "Тип сущности",
+                },
+                "id": {
+                    "type": "integer",
+                    "description": "ID записи",
+                },
+                "with": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Связанные данные",
+                },
+            },
+            "required": ["entity", "id"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="amocrm_create",
+        description="Создать сущности в AmoCRM (batch — можно передать массив)",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "entity": {
+                    "type": "string",
+                    "enum": ["lead", "contact", "company"],
+                    "description": "Тип сущности",
+                },
+                "items": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "Массив объектов для создания",
+                },
+            },
+            "required": ["entity", "items"],
+        },
+        kind=ToolKind.CREATE,
+    ),
+    make_tool(
+        name="amocrm_update",
+        description="Обновить сущность в AmoCRM",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "entity": {
+                    "type": "string",
+                    "enum": ["lead", "contact", "company"],
+                    "description": "Тип сущности",
+                },
+                "id": {
+                    "type": "integer",
+                    "description": "ID записи",
+                },
+                "fields": {
+                    "type": "object",
+                    "description": "Поля для обновления",
+                },
+            },
+            "required": ["entity", "id", "fields"],
+        },
+        kind=ToolKind.UPDATE,
+    ),
+    make_tool(
+        name="amocrm_pipelines",
+        description="Получить воронки продаж из AmoCRM (все или по ID)",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "pipeline_id": {
+                    "type": "integer",
+                    "description": "ID воронки (если не указан — все воронки)",
+                },
+            },
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="amocrm_account",
+        description="Получить информацию об аккаунте AmoCRM",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "with": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Доп. данные (например, ['amojo_id', 'users_groups'])",
+                },
+            },
+        },
+        kind=ToolKind.READ,
+    ),
+]
+
+
 @server.list_tools()
 async def list_tools() -> list[Tool]:
     """List available AmoCRM tools."""
-    return [
-        Tool(
-            name="amocrm_list",
-            description=(
-                "Получить список сущностей из AmoCRM (сделки, контакты, компании). "
-                "Поддерживает поиск, фильтрацию и связанные данные (with)."
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {
-                        "type": "string",
-                        "enum": ["lead", "contact", "company"],
-                        "description": "Тип сущности",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Записей на странице (макс 250)",
-                        "default": 50,
-                    },
-                    "page": {
-                        "type": "integer",
-                        "description": "Номер страницы",
-                        "default": 1,
-                    },
-                    "query": {
-                        "type": "string",
-                        "description": "Поисковый запрос",
-                    },
-                    "with": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": (
-                            "Связанные данные (например, ['contacts', 'catalog_elements'])"
-                        ),
-                    },
-                },
-                "required": ["entity"],
-            },
-        ),
-        Tool(
-            name="amocrm_get",
-            description="Получить одну сущность из AmoCRM по ID",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {
-                        "type": "string",
-                        "enum": ["lead", "contact", "company"],
-                        "description": "Тип сущности",
-                    },
-                    "id": {
-                        "type": "integer",
-                        "description": "ID записи",
-                    },
-                    "with": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Связанные данные",
-                    },
-                },
-                "required": ["entity", "id"],
-            },
-        ),
-        Tool(
-            name="amocrm_create",
-            description="Создать сущности в AmoCRM (batch — можно передать массив)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {
-                        "type": "string",
-                        "enum": ["lead", "contact", "company"],
-                        "description": "Тип сущности",
-                    },
-                    "items": {
-                        "type": "array",
-                        "items": {"type": "object"},
-                        "description": "Массив объектов для создания",
-                    },
-                },
-                "required": ["entity", "items"],
-            },
-        ),
-        Tool(
-            name="amocrm_update",
-            description="Обновить сущность в AmoCRM",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {
-                        "type": "string",
-                        "enum": ["lead", "contact", "company"],
-                        "description": "Тип сущности",
-                    },
-                    "id": {
-                        "type": "integer",
-                        "description": "ID записи",
-                    },
-                    "fields": {
-                        "type": "object",
-                        "description": "Поля для обновления",
-                    },
-                },
-                "required": ["entity", "id", "fields"],
-            },
-        ),
-        Tool(
-            name="amocrm_pipelines",
-            description="Получить воронки продаж из AmoCRM (все или по ID)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "pipeline_id": {
-                        "type": "integer",
-                        "description": "ID воронки (если не указан — все воронки)",
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="amocrm_account",
-            description="Получить информацию об аккаунте AmoCRM",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "with": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Доп. данные (например, ['amojo_id', 'users_groups'])",
-                    },
-                },
-            },
-        ),
-    ]
+    return visible_tools(TOOLS)
 
 
 @server.call_tool()
-async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] | CallToolResult:
     """Handle tool calls."""
+    # First, before any client or credential is touched: hiding tools in list_tools is not enough.
+    if (refused := refuse_if_read_only(TOOLS, name)) is not None:
+        return refused
     client = await _ensure_client()
 
     if name == "amocrm_list":

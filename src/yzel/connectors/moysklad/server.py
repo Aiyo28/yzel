@@ -12,9 +12,11 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
+from yzel.core.outcome import error_result
+from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import MoyskladCredential
 from yzel.core.vault import CredentialVault
 
@@ -77,160 +79,167 @@ _ENTITY_TYPES = {
 }
 
 
+TOOLS: list[Tool] = [
+    make_tool(
+        name="moysklad_list",
+        description=(
+            "Получить список сущностей из МойСклад (контрагенты, товары, заказы). "
+            "Поддерживает фильтрацию, поиск и раскрытие вложенных объектов (expand)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "entity": {
+                    "type": "string",
+                    "enum": ["counterparty", "product", "customerorder"],
+                    "description": "Тип сущности",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": ("Максимальное количество записей (по умолчанию 25, макс 1000)"),
+                    "default": 25,
+                },
+                "offset": {
+                    "type": "integer",
+                    "description": "Смещение для пагинации",
+                    "default": 0,
+                },
+                "filter": {
+                    "type": "string",
+                    "description": "Фильтр МойСклад (например, 'name=ООО Рога')",
+                },
+                "search": {
+                    "type": "string",
+                    "description": "Полнотекстовый поиск",
+                },
+                "expand": {
+                    "type": "string",
+                    "description": (
+                        "Раскрыть вложенные объекты (например, 'agent,organization'). "
+                        "Без expand вложенные объекты возвращаются как UUID-ссылки."
+                    ),
+                },
+                "order": {
+                    "type": "string",
+                    "description": "Сортировка (например, 'name,asc')",
+                },
+            },
+            "required": ["entity"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="moysklad_get",
+        description="Получить одну сущность из МойСклад по ID (UUID)",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "entity": {
+                    "type": "string",
+                    "enum": ["counterparty", "product", "customerorder"],
+                    "description": "Тип сущности",
+                },
+                "id": {
+                    "type": "string",
+                    "description": "UUID сущности",
+                },
+                "expand": {
+                    "type": "string",
+                    "description": "Раскрыть вложенные объекты",
+                },
+            },
+            "required": ["entity", "id"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="moysklad_create",
+        description="Создать сущность в МойСклад",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "entity": {
+                    "type": "string",
+                    "enum": ["counterparty", "product", "customerorder"],
+                    "description": "Тип сущности",
+                },
+                "fields": {
+                    "type": "object",
+                    "description": "Поля для создания",
+                },
+            },
+            "required": ["entity", "fields"],
+        },
+        kind=ToolKind.CREATE,
+    ),
+    make_tool(
+        name="moysklad_update",
+        description="Обновить сущность в МойСклад",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "entity": {
+                    "type": "string",
+                    "enum": ["counterparty", "product", "customerorder"],
+                    "description": "Тип сущности",
+                },
+                "id": {
+                    "type": "string",
+                    "description": "UUID сущности",
+                },
+                "fields": {
+                    "type": "object",
+                    "description": "Поля для обновления",
+                },
+            },
+            "required": ["entity", "id", "fields"],
+        },
+        kind=ToolKind.UPDATE,
+    ),
+    make_tool(
+        name="moysklad_stock",
+        description=(
+            "Получить остатки товаров из МойСклад (по всем складам или по каждому складу)"
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "type": "string",
+                    "enum": ["all", "bystore"],
+                    "description": "Режим: 'all' — сводные остатки, 'bystore' — по складам",
+                    "default": "all",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Максимальное количество записей",
+                },
+                "offset": {
+                    "type": "integer",
+                    "description": "Смещение для пагинации",
+                },
+                "groupBy": {
+                    "type": "string",
+                    "enum": ["product", "variant"],
+                    "description": "Группировка (только для режима 'all')",
+                },
+            },
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="moysklad_organizations",
+        description="Получить список юрлиц из МойСклад",
+        input_schema={"type": "object", "properties": {}},
+        kind=ToolKind.READ,
+    ),
+]
+
+
 @server.list_tools()
 async def list_tools() -> list[Tool]:
     """List available Moysklad tools."""
-    return [
-        Tool(
-            name="moysklad_list",
-            description=(
-                "Получить список сущностей из МойСклад (контрагенты, товары, заказы). "
-                "Поддерживает фильтрацию, поиск и раскрытие вложенных объектов (expand)."
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {
-                        "type": "string",
-                        "enum": ["counterparty", "product", "customerorder"],
-                        "description": "Тип сущности",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": (
-                            "Максимальное количество записей (по умолчанию 25, макс 1000)"
-                        ),
-                        "default": 25,
-                    },
-                    "offset": {
-                        "type": "integer",
-                        "description": "Смещение для пагинации",
-                        "default": 0,
-                    },
-                    "filter": {
-                        "type": "string",
-                        "description": "Фильтр МойСклад (например, 'name=ООО Рога')",
-                    },
-                    "search": {
-                        "type": "string",
-                        "description": "Полнотекстовый поиск",
-                    },
-                    "expand": {
-                        "type": "string",
-                        "description": (
-                            "Раскрыть вложенные объекты (например, 'agent,organization'). "
-                            "Без expand вложенные объекты возвращаются как UUID-ссылки."
-                        ),
-                    },
-                    "order": {
-                        "type": "string",
-                        "description": "Сортировка (например, 'name,asc')",
-                    },
-                },
-                "required": ["entity"],
-            },
-        ),
-        Tool(
-            name="moysklad_get",
-            description="Получить одну сущность из МойСклад по ID (UUID)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {
-                        "type": "string",
-                        "enum": ["counterparty", "product", "customerorder"],
-                        "description": "Тип сущности",
-                    },
-                    "id": {
-                        "type": "string",
-                        "description": "UUID сущности",
-                    },
-                    "expand": {
-                        "type": "string",
-                        "description": "Раскрыть вложенные объекты",
-                    },
-                },
-                "required": ["entity", "id"],
-            },
-        ),
-        Tool(
-            name="moysklad_create",
-            description="Создать сущность в МойСклад",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {
-                        "type": "string",
-                        "enum": ["counterparty", "product", "customerorder"],
-                        "description": "Тип сущности",
-                    },
-                    "fields": {
-                        "type": "object",
-                        "description": "Поля для создания",
-                    },
-                },
-                "required": ["entity", "fields"],
-            },
-        ),
-        Tool(
-            name="moysklad_update",
-            description="Обновить сущность в МойСклад",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {
-                        "type": "string",
-                        "enum": ["counterparty", "product", "customerorder"],
-                        "description": "Тип сущности",
-                    },
-                    "id": {
-                        "type": "string",
-                        "description": "UUID сущности",
-                    },
-                    "fields": {
-                        "type": "object",
-                        "description": "Поля для обновления",
-                    },
-                },
-                "required": ["entity", "id", "fields"],
-            },
-        ),
-        Tool(
-            name="moysklad_stock",
-            description=(
-                "Получить остатки товаров из МойСклад (по всем складам или по каждому складу)"
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "mode": {
-                        "type": "string",
-                        "enum": ["all", "bystore"],
-                        "description": "Режим: 'all' — сводные остатки, 'bystore' — по складам",
-                        "default": "all",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Максимальное количество записей",
-                    },
-                    "offset": {
-                        "type": "integer",
-                        "description": "Смещение для пагинации",
-                    },
-                    "groupBy": {
-                        "type": "string",
-                        "enum": ["product", "variant"],
-                        "description": "Группировка (только для режима 'all')",
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="moysklad_organizations",
-            description="Получить список юрлиц из МойСклад",
-            inputSchema={"type": "object", "properties": {}},
-        ),
-    ]
+    return visible_tools(TOOLS)
 
 
 def _as_text(payload: Any) -> list[TextContent]:
@@ -238,8 +247,11 @@ def _as_text(payload: Any) -> list[TextContent]:
 
 
 @server.call_tool()
-async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] | CallToolResult:
     """Handle tool calls."""
+    # First, before any client or credential is touched: hiding tools in list_tools is not enough.
+    if (refused := refuse_if_read_only(TOOLS, name)) is not None:
+        return refused
     try:
         client = await _ensure_client()
 
@@ -299,7 +311,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
 
     except MoyskladError as exc:
-        return [TextContent(type="text", text=f"Ошибка МойСклад: {exc.message}")]
+        return error_result(f"Ошибка МойСклад: {exc.message}")
 
 
 async def main() -> None:

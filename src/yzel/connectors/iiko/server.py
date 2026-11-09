@@ -8,9 +8,11 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
+from yzel.core.outcome import error_result
+from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import IikoCredential
 from yzel.core.vault import CredentialVault
 
@@ -52,99 +54,112 @@ _ORG_IDS_SCHEMA = {
 }
 
 
+TOOLS: list[Tool] = [
+    make_tool(
+        name="iiko_organizations",
+        description="Список организаций (ресторанов) iiko",
+        input_schema={
+            "type": "object",
+            "properties": {"organization_ids": _ORG_IDS_SCHEMA},
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="iiko_terminal_groups",
+        description="Группы терминалов по организациям",
+        input_schema={
+            "type": "object",
+            "properties": {"organization_ids": _ORG_IDS_SCHEMA},
+            "required": ["organization_ids"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="iiko_nomenclature",
+        description="Меню (номенклатура) одной организации",
+        input_schema={
+            "type": "object",
+            "properties": {"organization_id": {"type": "string"}},
+            "required": ["organization_id"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="iiko_stop_list",
+        description="Стоп-лист (товары, которых сейчас нет)",
+        input_schema={
+            "type": "object",
+            "properties": {"organization_ids": _ORG_IDS_SCHEMA},
+            "required": ["organization_ids"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="iiko_deliveries_by_phone",
+        description="Доставки клиента по номеру телефона",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "organization_ids": _ORG_IDS_SCHEMA,
+                "phone": {"type": "string"},
+                "delivery_date_from": {"type": "string"},
+                "delivery_date_to": {"type": "string"},
+            },
+            "required": ["organization_ids", "phone"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="iiko_create_delivery",
+        description="Создать заказ на доставку",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "organization_id": {"type": "string"},
+                "terminal_group_id": {"type": "string"},
+                "order": {"type": "object"},
+            },
+            "required": ["organization_id", "terminal_group_id", "order"],
+        },
+        kind=ToolKind.CREATE,
+    ),
+    make_tool(
+        name="iiko_order_types",
+        description="Типы заказов (в зале / на вынос / доставка)",
+        input_schema={
+            "type": "object",
+            "properties": {"organization_ids": _ORG_IDS_SCHEMA},
+            "required": ["organization_ids"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="iiko_payment_types",
+        description="Типы оплаты",
+        input_schema={
+            "type": "object",
+            "properties": {"organization_ids": _ORG_IDS_SCHEMA},
+            "required": ["organization_ids"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="iiko_employees",
+        description="Сотрудники по организациям",
+        input_schema={
+            "type": "object",
+            "properties": {"organization_ids": _ORG_IDS_SCHEMA},
+            "required": ["organization_ids"],
+        },
+        kind=ToolKind.READ,
+    ),
+]
+
+
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    return [
-        Tool(
-            name="iiko_organizations",
-            description="Список организаций (ресторанов) iiko",
-            inputSchema={
-                "type": "object",
-                "properties": {"organization_ids": _ORG_IDS_SCHEMA},
-            },
-        ),
-        Tool(
-            name="iiko_terminal_groups",
-            description="Группы терминалов по организациям",
-            inputSchema={
-                "type": "object",
-                "properties": {"organization_ids": _ORG_IDS_SCHEMA},
-                "required": ["organization_ids"],
-            },
-        ),
-        Tool(
-            name="iiko_nomenclature",
-            description="Меню (номенклатура) одной организации",
-            inputSchema={
-                "type": "object",
-                "properties": {"organization_id": {"type": "string"}},
-                "required": ["organization_id"],
-            },
-        ),
-        Tool(
-            name="iiko_stop_list",
-            description="Стоп-лист (товары, которых сейчас нет)",
-            inputSchema={
-                "type": "object",
-                "properties": {"organization_ids": _ORG_IDS_SCHEMA},
-                "required": ["organization_ids"],
-            },
-        ),
-        Tool(
-            name="iiko_deliveries_by_phone",
-            description="Доставки клиента по номеру телефона",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "organization_ids": _ORG_IDS_SCHEMA,
-                    "phone": {"type": "string"},
-                    "delivery_date_from": {"type": "string"},
-                    "delivery_date_to": {"type": "string"},
-                },
-                "required": ["organization_ids", "phone"],
-            },
-        ),
-        Tool(
-            name="iiko_create_delivery",
-            description="Создать заказ на доставку",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "organization_id": {"type": "string"},
-                    "terminal_group_id": {"type": "string"},
-                    "order": {"type": "object"},
-                },
-                "required": ["organization_id", "terminal_group_id", "order"],
-            },
-        ),
-        Tool(
-            name="iiko_order_types",
-            description="Типы заказов (в зале / на вынос / доставка)",
-            inputSchema={
-                "type": "object",
-                "properties": {"organization_ids": _ORG_IDS_SCHEMA},
-                "required": ["organization_ids"],
-            },
-        ),
-        Tool(
-            name="iiko_payment_types",
-            description="Типы оплаты",
-            inputSchema={
-                "type": "object",
-                "properties": {"organization_ids": _ORG_IDS_SCHEMA},
-                "required": ["organization_ids"],
-            },
-        ),
-        Tool(
-            name="iiko_employees",
-            description="Сотрудники по организациям",
-            inputSchema={
-                "type": "object",
-                "properties": {"organization_ids": _ORG_IDS_SCHEMA},
-                "required": ["organization_ids"],
-            },
-        ),
-    ]
+    """List available tools (only the read ones in read-only mode)."""
+    return visible_tools(TOOLS)
 
 
 def _as_text(payload: Any) -> list[TextContent]:
@@ -152,7 +167,10 @@ def _as_text(payload: Any) -> list[TextContent]:
 
 
 @server.call_tool()
-async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] | CallToolResult:
+    # First, before any client or credential is touched: hiding tools in list_tools is not enough.
+    if (refused := refuse_if_read_only(TOOLS, name)) is not None:
+        return refused
     try:
         client = await _ensure_client()
 
@@ -199,7 +217,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
 
     except IikoError as exc:
-        return [TextContent(type="text", text=f"Ошибка iiko: {exc.message}")]
+        return error_result(f"Ошибка iiko: {exc.message}")
 
 
 async def main() -> None:

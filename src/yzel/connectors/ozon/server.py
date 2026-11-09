@@ -11,9 +11,11 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
+from yzel.core.outcome import error_result
+from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import OzonCredential
 from yzel.core.vault import CredentialVault
 
@@ -48,151 +50,166 @@ async def _ensure_client() -> OzonClient:
     return _client
 
 
+TOOLS: list[Tool] = [
+    make_tool(
+        name="ozon_list_warehouses",
+        description="Список складов продавца Ozon",
+        input_schema={"type": "object", "properties": {}},
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="ozon_list_products",
+        description="Список товаров (пагинация через last_id)",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "default": 100},
+                "last_id": {"type": "string", "default": ""},
+                "visibility": {
+                    "type": "string",
+                    "default": "ALL",
+                    "description": "ALL, VISIBLE, INVISIBLE, EMPTY_STOCK, NOT_MODERATED, ...",
+                },
+            },
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="ozon_product_info",
+        description="Детали товаров по offer_id / product_id / sku",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "offer_ids": {"type": "array", "items": {"type": "string"}},
+                "product_ids": {"type": "array", "items": {"type": "integer"}},
+                "skus": {"type": "array", "items": {"type": "integer"}},
+            },
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="ozon_get_stocks",
+        description="Остатки по SKU",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "skus": {"type": "array", "items": {"type": "integer"}},
+            },
+            "required": ["skus"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="ozon_update_stocks",
+        description="Обновить остатки. stocks = [{offer_id, stock, warehouse_id}]",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "stocks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "offer_id": {"type": "string"},
+                            "stock": {"type": "integer"},
+                            "warehouse_id": {"type": "integer"},
+                        },
+                        "required": ["offer_id", "stock", "warehouse_id"],
+                    },
+                }
+            },
+            "required": ["stocks"],
+        },
+        kind=ToolKind.UPDATE,
+    ),
+    make_tool(
+        name="ozon_update_prices",
+        description="Обновить цены. prices = [{offer_id, price, min_price?, old_price?}]",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "prices": {"type": "array", "items": {"type": "object"}},
+            },
+            "required": ["prices"],
+        },
+        kind=ToolKind.UPDATE,
+    ),
+    make_tool(
+        name="ozon_unfulfilled",
+        description="Неотгруженные сборочные задания FBS",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "default": 100},
+                "offset": {"type": "integer", "default": 0},
+            },
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="ozon_list_postings",
+        description="Сборочные задания FBS за период (ISO-8601)",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "since": {"type": "string"},
+                "to": {"type": "string"},
+                "limit": {"type": "integer", "default": 100},
+                "offset": {"type": "integer", "default": 0},
+                "status": {"type": "string", "default": ""},
+            },
+            "required": ["since", "to"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="ozon_get_posting",
+        description="Детали сборочного задания по номеру",
+        input_schema={
+            "type": "object",
+            "properties": {"posting_number": {"type": "string"}},
+            "required": ["posting_number"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="ozon_analytics",
+        description="Аналитические данные продавца за период",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "date_from": {"type": "string"},
+                "date_to": {"type": "string"},
+                "metrics": {"type": "array", "items": {"type": "string"}},
+                "dimension": {"type": "array", "items": {"type": "string"}},
+                "limit": {"type": "integer", "default": 100},
+            },
+            "required": ["date_from", "date_to", "metrics"],
+        },
+        kind=ToolKind.READ,
+    ),
+    make_tool(
+        name="ozon_transactions",
+        description="Финансовые операции за период",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "since": {"type": "string"},
+                "to": {"type": "string"},
+                "page": {"type": "integer", "default": 1},
+                "page_size": {"type": "integer", "default": 100},
+            },
+            "required": ["since", "to"],
+        },
+        kind=ToolKind.READ,
+    ),
+]
+
+
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    return [
-        Tool(
-            name="ozon_list_warehouses",
-            description="Список складов продавца Ozon",
-            inputSchema={"type": "object", "properties": {}},
-        ),
-        Tool(
-            name="ozon_list_products",
-            description="Список товаров (пагинация через last_id)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "limit": {"type": "integer", "default": 100},
-                    "last_id": {"type": "string", "default": ""},
-                    "visibility": {
-                        "type": "string",
-                        "default": "ALL",
-                        "description": "ALL, VISIBLE, INVISIBLE, EMPTY_STOCK, NOT_MODERATED, ...",
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="ozon_product_info",
-            description="Детали товаров по offer_id / product_id / sku",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "offer_ids": {"type": "array", "items": {"type": "string"}},
-                    "product_ids": {"type": "array", "items": {"type": "integer"}},
-                    "skus": {"type": "array", "items": {"type": "integer"}},
-                },
-            },
-        ),
-        Tool(
-            name="ozon_get_stocks",
-            description="Остатки по SKU",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "skus": {"type": "array", "items": {"type": "integer"}},
-                },
-                "required": ["skus"],
-            },
-        ),
-        Tool(
-            name="ozon_update_stocks",
-            description="Обновить остатки. stocks = [{offer_id, stock, warehouse_id}]",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "stocks": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "offer_id": {"type": "string"},
-                                "stock": {"type": "integer"},
-                                "warehouse_id": {"type": "integer"},
-                            },
-                            "required": ["offer_id", "stock", "warehouse_id"],
-                        },
-                    }
-                },
-                "required": ["stocks"],
-            },
-        ),
-        Tool(
-            name="ozon_update_prices",
-            description="Обновить цены. prices = [{offer_id, price, min_price?, old_price?}]",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "prices": {"type": "array", "items": {"type": "object"}},
-                },
-                "required": ["prices"],
-            },
-        ),
-        Tool(
-            name="ozon_unfulfilled",
-            description="Неотгруженные сборочные задания FBS",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "limit": {"type": "integer", "default": 100},
-                    "offset": {"type": "integer", "default": 0},
-                },
-            },
-        ),
-        Tool(
-            name="ozon_list_postings",
-            description="Сборочные задания FBS за период (ISO-8601)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "since": {"type": "string"},
-                    "to": {"type": "string"},
-                    "limit": {"type": "integer", "default": 100},
-                    "offset": {"type": "integer", "default": 0},
-                    "status": {"type": "string", "default": ""},
-                },
-                "required": ["since", "to"],
-            },
-        ),
-        Tool(
-            name="ozon_get_posting",
-            description="Детали сборочного задания по номеру",
-            inputSchema={
-                "type": "object",
-                "properties": {"posting_number": {"type": "string"}},
-                "required": ["posting_number"],
-            },
-        ),
-        Tool(
-            name="ozon_analytics",
-            description="Аналитические данные продавца за период",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "date_from": {"type": "string"},
-                    "date_to": {"type": "string"},
-                    "metrics": {"type": "array", "items": {"type": "string"}},
-                    "dimension": {"type": "array", "items": {"type": "string"}},
-                    "limit": {"type": "integer", "default": 100},
-                },
-                "required": ["date_from", "date_to", "metrics"],
-            },
-        ),
-        Tool(
-            name="ozon_transactions",
-            description="Финансовые операции за период",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "since": {"type": "string"},
-                    "to": {"type": "string"},
-                    "page": {"type": "integer", "default": 1},
-                    "page_size": {"type": "integer", "default": 100},
-                },
-                "required": ["since", "to"],
-            },
-        ),
-    ]
+    """List available tools (only the read ones in read-only mode)."""
+    return visible_tools(TOOLS)
 
 
 def _as_text(payload: Any) -> list[TextContent]:
@@ -200,7 +217,10 @@ def _as_text(payload: Any) -> list[TextContent]:
 
 
 @server.call_tool()
-async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] | CallToolResult:
+    # First, before any client or credential is touched: hiding tools in list_tools is not enough.
+    if (refused := refuse_if_read_only(TOOLS, name)) is not None:
+        return refused
     try:
         client = await _ensure_client()
 
@@ -280,7 +300,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
 
     except OzonError as exc:
-        return [TextContent(type="text", text=f"Ошибка Ozon: {exc.message}")]
+        return error_result(f"Ошибка Ozon: {exc.message}")
 
 
 async def main() -> None:
