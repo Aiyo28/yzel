@@ -24,7 +24,7 @@ clean and gated in CI.
 
 | Layer | What exists | What it proves | What it cannot prove |
 |---|---|---|---|
-| **L1 — unit / mock** | 138 tests, 8 mock servers (`tests/mock_*_server.py`) | Our client builds the right request and parses the response we expect | Nothing about the real API. A mock encodes the author's *belief* about the vendor, frozen at the date it was written |
+| **L1 — unit / mock** | Unit tests, 8 mock servers (`tests/mock_*_server.py`) | Our client builds the right request and parses the response we expect | Nothing about the real API. A mock encodes the author's *belief* about the vendor, frozen at the date it was written |
 | **L2 — live read probe** | Ad hoc, once, for 1C transport + `$metadata` | The vendor still answers the shape we assume | Write behaviour, permissions, rate limits under load |
 | **L3 — live write probe** | Nothing | End-to-end mutation | — |
 
