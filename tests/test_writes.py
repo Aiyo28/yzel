@@ -230,6 +230,9 @@ async def test_http_status_error_5xx_on_create_may_have_applied_and_is_guarded()
 async def test_http_status_error_4xx_is_rejected() -> None:
     result = await run(CREATE, Spy(raises=http_status_error(400)))
     assert body(result)["outcome"] == "rejected"
+    # The English text of httpx carries the request URL (Telegram's holds the bot token).
+    assert "http" not in body(result)["message"]
+    assert "400" in body(result)["message"]
 
 
 async def test_unreadable_2xx_body_on_create_may_have_applied_and_is_guarded() -> None:

@@ -75,8 +75,10 @@ class IikoClient:
         api_login: str,
         base_url: str = "https://api-ru.iiko.services",
         max_per_second: float = 0.25,
+        timeout: float = 30.0,
     ) -> None:
         self._api_login = api_login
+        self._timeout = timeout
         self._base = base_url.rstrip("/")
         self._client: httpx.AsyncClient | None = None
         self._limiter = RateLimiter(max_per_second=max_per_second)
@@ -86,7 +88,7 @@ class IikoClient:
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(timeout=30.0)
+            self._client = httpx.AsyncClient(timeout=self._timeout)
         return self._client
 
     async def _refresh_token(self) -> None:

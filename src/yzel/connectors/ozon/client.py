@@ -75,8 +75,10 @@ class OzonClient:
         api_key: str,
         base_url: str = "https://api-seller.ozon.ru",
         max_per_second: float = 5.0,
+        timeout: float = 30.0,
     ) -> None:
         self._client_id = client_id
+        self._timeout = timeout
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._client: httpx.AsyncClient | None = None
@@ -85,7 +87,7 @@ class OzonClient:
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
-                timeout=30.0,
+                timeout=self._timeout,
                 headers={
                     "Client-Id": self._client_id,
                     "Api-Key": self._api_key,

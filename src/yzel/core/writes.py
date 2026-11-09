@@ -63,7 +63,13 @@ def _recently_made(key: tuple[str, str]) -> bool:
 
 
 def _reason(exc: Exception) -> str:
-    """Readable text of a connector error: its `message`, `detail` or `description` field."""
+    """Readable text of a connector error: its `message`, `detail` or `description` field.
+
+    A bare `HTTPStatusError` gets a Russian line with the status only: httpx's own text holds
+    the request URL, and Telegram's URL holds the bot token.
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"Сервер ответил {exc.response.status_code}"
     for attr in ("message", "detail", "description"):
         value = getattr(exc, attr, None)
         if isinstance(value, str) and value:
@@ -103,7 +109,8 @@ async def run_write(
     typed_errors: tuple[type[Exception], ...] = (*error_types, httpx.HTTPStatusError)
 
     # shortcut: check-then-act across an await, so identical creates sent in one parallel tool
-    # batch can both pass. Sequential retries (the case this guards) are caught.
+    # batch can both pass. Sequential retries (the case this guards) are caught. Upgrade: record
+    # a pending marker before sending if parallel duplicates are ever seen.
     if is_create and arguments.get("again") is not True and _recently_made(key):
         look = f"Сначала проверьте через {check_tool}. " if check_tool else "Сначала проверьте. "
         return outcome_result(

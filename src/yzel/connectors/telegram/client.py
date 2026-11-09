@@ -83,8 +83,10 @@ class TelegramClient:
         bot_token: str,
         base_url: str = "https://api.telegram.org",
         max_per_second: float = 25.0,
+        timeout: float = 60.0,  # long enough for long-polling getUpdates
     ) -> None:
         self._token = bot_token
+        self._timeout = timeout
         self._base = f"{base_url.rstrip('/')}/bot{bot_token}"
         self._client: httpx.AsyncClient | None = None
         self._limiter = RateLimiter(max_per_second=max_per_second)
@@ -92,7 +94,7 @@ class TelegramClient:
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
-                timeout=60.0,  # long enough for long-polling getUpdates
+                timeout=self._timeout,
                 headers={"Accept": "application/json"},
             )
         return self._client
