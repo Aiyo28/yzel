@@ -209,3 +209,53 @@ async def test_unexpected_exception_propagates_and_is_not_recorded() -> None:
     with pytest.raises(KeyError):
         await run(CREATE, Spy(raises=KeyError("entity")), {"a": 1})
     assert body(await run(CREATE, Spy(returns=1), {"a": 1}))["outcome"] == "applied"
+
+
+def http_status_error(status: int) -> httpx.HTTPStatusError:
+    request = httpx.Request("POST", "http://x")
+    return httpx.HTTPStatusError(
+        "bad gateway", request=request, response=httpx.Response(status, request=request)
+    )
+
+
+async def test_http_status_error_5xx_on_create_may_have_applied_and_is_guarded() -> None:
+    args = {"entity": "A"}
+    result = await run(CREATE, Spy(raises=http_status_error(502)), args)
+    assert body(result)["outcome"] == "may_have_applied"
+    second = Spy(returns=1)
+    assert body(await run(CREATE, second, args))["outcome"] == "duplicate_refused"
+    assert second.calls == 0
+
+
+async def test_http_status_error_4xx_is_rejected() -> None:
+    result = await run(CREATE, Spy(raises=http_status_error(400)))
+    assert body(result)["outcome"] == "rejected"
+
+
+async def test_unreadable_2xx_body_on_create_may_have_applied_and_is_guarded() -> None:
+    args = {"entity": "A"}
+    result = await run(CREATE, Spy(raises=json.JSONDecodeError("x", "", 0)), args)
+    assert body(result)["outcome"] == "may_have_applied"
+    assert body(await run(CREATE, Spy(returns=1), args))["outcome"] == "duplicate_refused"
+
+
+class DetailError(Exception):
+    def __init__(self) -> None:
+        self.detail = "Неверный pipeline"
+        super().__init__("AmoCRM error")
+
+
+class DescriptionError(Exception):
+    def __init__(self) -> None:
+        self.description = "Чат не найден"
+        super().__init__("Telegram error")
+
+
+@pytest.mark.parametrize(
+    ("exc", "text"), [(DetailError(), "Неверный pipeline"), (DescriptionError(), "Чат не найден")]
+)
+async def test_reason_reads_detail_and_description(exc: Exception, text: str) -> None:
+    result = await run_write(CREATE, {}, Spy(raises=exc), error_types=(type(exc),))
+    assert body(result)["outcome"] == "rejected"
+    assert text in body(result)["message"]
+    assert "error" not in body(result)["message"]

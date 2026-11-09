@@ -2,9 +2,12 @@
 
 The failure this prevents: a create times out after the server already committed, the agent
 sees an empty error and calls again, and the document exists twice. `run_write` classifies
-what happened (see the table in docs/specs/write-safety.md), tells the agent whether a resend
-is safe, and refuses an identical CREATE for 10 minutes after one that applied or may have.
-The guard lives in this process only; a restart forgets it.
+what happened, tells the agent whether a resend is safe, and refuses an identical CREATE for
+10 minutes after one that applied or may have. Outcomes: 2xx applied; a typed error below 500
+rejected (nothing written); a failure before the request left not_sent (resend safe); a timeout,
+a dropped connection, a 5xx or an unreadable 2xx body may_have_applied (resend safe except for
+creates); a guarded repeat duplicate_refused. The guard lives in this process only; a restart
+forgets it.
 """
 
 from __future__ import annotations
@@ -27,6 +30,8 @@ GUARD_WINDOW_SECONDS = 600.0
 _NOT_SENT = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
 
 _now: Callable[[], float] = time.monotonic
+# shortcut: entries are never evicted. Fine at one user per process; prune on insert if that
+# changes.
 _recent: dict[tuple[str, str], float] = {}
 
 
@@ -36,7 +41,9 @@ def reset_guard() -> None:
 
 
 def status_of(exc: Exception) -> int | None:
-    """HTTP status carried by a typed connector error: `status_code`, else `status`, else None."""
+    """HTTP status of a typed connector error (`status_code`, else `status`) or HTTPStatusError."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code
     for attr in ("status_code", "status"):
         value = getattr(exc, attr, None)
         if isinstance(value, int):
@@ -50,21 +57,22 @@ def _guard_key(tool: Tool, arguments: dict[str, Any]) -> tuple[str, str]:
     return tool.name, json.dumps(args, sort_keys=True, ensure_ascii=False, default=str)
 
 
-def _record(key: tuple[str, str]) -> None:
-    _recent[key] = _now()
-
-
 def _recently_made(key: tuple[str, str]) -> bool:
     made_at = _recent.get(key)
     return made_at is not None and _now() - made_at < GUARD_WINDOW_SECONDS
 
 
 def _reason(exc: Exception) -> str:
-    return str(getattr(exc, "message", "") or exc) or type(exc).__name__
+    """Readable text of a connector error: its `message`, `detail` or `description` field."""
+    for attr in ("message", "detail", "description"):
+        value = getattr(exc, attr, None)
+        if isinstance(value, str) and value:
+            return value
+    return str(exc) or type(exc).__name__
 
 
-def _may_have_applied(tool: Tool, kind: ToolKind, check_tool: str | None) -> CallToolResult:
-    if kind is ToolKind.CREATE:
+def _may_have_applied(is_create: bool, check_tool: str | None) -> CallToolResult:
+    if is_create:
         look = f" — проверьте через {check_tool}" if check_tool else ""
         return outcome_result(
             Outcome.MAY_HAVE_APPLIED,
@@ -90,10 +98,12 @@ async def run_write(
     check_tool: str | None = None,
 ) -> CallToolResult:
     """Run one write call and report its outcome. Other exceptions propagate unchanged."""
-    kind = kind_of(tool)
-    is_create = kind is ToolKind.CREATE
+    is_create = kind_of(tool) is ToolKind.CREATE
     key = _guard_key(tool, arguments)
+    typed_errors: tuple[type[Exception], ...] = (*error_types, httpx.HTTPStatusError)
 
+    # shortcut: check-then-act across an await, so identical creates sent in one parallel tool
+    # batch can both pass. Sequential retries (the case this guards) are caught.
     if is_create and arguments.get("again") is not True and _recently_made(key):
         look = f"Сначала проверьте через {check_tool}. " if check_tool else "Сначала проверьте. "
         return outcome_result(
@@ -110,21 +120,20 @@ async def run_write(
             "Запрос не ушёл (нет соединения), ничего не записано. Можно отправить повторно.",
             resend_safe=True,
         )
-    except httpx.TransportError:
-        if is_create:
-            _record(key)
-        return _may_have_applied(tool, kind, check_tool)
-    except error_types as exc:
+    except (httpx.TransportError, json.JSONDecodeError):
+        # Sent, but no usable answer (a 2xx body that is not JSON counts: the write happened).
+        result = _may_have_applied(is_create, check_tool)
+    except typed_errors as exc:
         status = status_of(exc)
-        if status is not None and status >= 500:
-            if is_create:
-                _record(key)
-            return _may_have_applied(tool, kind, check_tool)
-        return outcome_result(
-            Outcome.REJECTED,
-            f"{_reason(exc)}. Ничего не записано: исправьте запрос и отправьте заново.",
-        )
+        if status is None or status < 500:
+            return outcome_result(
+                Outcome.REJECTED,
+                f"{_reason(exc)}. Ничего не записано: исправьте запрос и отправьте заново.",
+            )
+        result = _may_have_applied(is_create, check_tool)
+    else:
+        result = outcome_result(Outcome.APPLIED, "Выполнено.", result=payload)
 
     if is_create:
-        _record(key)
-    return outcome_result(Outcome.APPLIED, "Выполнено.", result=payload)
+        _recent[key] = _now()
+    return result

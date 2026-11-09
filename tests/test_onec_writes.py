@@ -18,7 +18,7 @@ from yzel.connectors.onec import server as onec
 from yzel.connectors.onec.odata import OneCODataClient
 from yzel.core import writes
 
-PORT = 8079
+PORT = 8184
 BASE = f"http://127.0.0.1:{PORT}/odata"
 STALL_SECONDS = 0.8
 CLIENT_TIMEOUT = 0.2

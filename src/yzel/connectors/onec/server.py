@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from mcp.server import Server
@@ -215,26 +216,20 @@ def _as_text(payload: Any) -> list[TextContent]:
     return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]
 
 
-_WRITE_TOOLS = {"onec_create", "onec_update", "onec_delete"}
+_TOOLS_BY_NAME = {t.name: t for t in TOOLS}
 
 
-async def _run_onec_write(
-    client: OneCODataClient, name: str, arguments: dict[str, Any]
-) -> CallToolResult:
-    """Run onec_create / onec_update / onec_delete through the write runner."""
-    tool = next(t for t in TOOLS if t.name == name)
-
-    async def call() -> Any:
-        if name == "onec_create":
-            return await client.create_entity(arguments["entity"], arguments["data"])
-        if name == "onec_update":
-            return await client.update_entity(
-                arguments["entity"], arguments["key"], arguments["data"]
-            )
-        await client.delete_entity(arguments["entity"], arguments["key"])
-        return "Запись помечена на удаление"
-
-    return await run_write(tool, arguments, call, error_types=(OneCError,), check_tool="onec_query")
+def _write(
+    name: str, arguments: dict[str, Any], call: Callable[[], Awaitable[Any]]
+) -> Awaitable[CallToolResult]:
+    """Run one 1C write through the write runner."""
+    return run_write(
+        _TOOLS_BY_NAME[name],
+        arguments,
+        call,
+        error_types=(OneCError,),
+        check_tool="onec_query",
+    )
 
 
 @server.call_tool()
@@ -285,8 +280,29 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             )
             return [TextContent(type="text", text=str(total))]
 
-        if name in _WRITE_TOOLS:
-            return await _run_onec_write(client, name, arguments)
+        if name == "onec_create":
+            return await _write(
+                name,
+                arguments,
+                lambda: client.create_entity(arguments["entity"], arguments["data"]),
+            )
+
+        if name == "onec_update":
+            return await _write(
+                name,
+                arguments,
+                lambda: client.update_entity(
+                    arguments["entity"], arguments["key"], arguments["data"]
+                ),
+            )
+
+        if name == "onec_delete":
+
+            async def delete() -> str:
+                await client.delete_entity(arguments["entity"], arguments["key"])
+                return "Запись помечена на удаление"
+
+            return await _write(name, arguments, delete)
 
         return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
 
