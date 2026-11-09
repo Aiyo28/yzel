@@ -16,7 +16,15 @@ import pytest
 from mcp.types import CallToolResult, TextContent, Tool
 
 import yzel.connectors
-from tests.connector_cases import BAD_REQUEST, SERVERS, ServerCase, connected, watch_backend
+from tests.connector_cases import (
+    BAD_REQUEST,
+    SERVERS,
+    WRITE_CASES,
+    ServerCase,
+    connected,
+    watch_backend,
+)
+from tests.harness import body
 from yzel.core.tools import ToolKind, kind_of, make_tool
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,15 +37,6 @@ ANNOTATIONS: dict[ToolKind, tuple[bool | None, bool | None, bool | None]] = {
     ToolKind.UPDATE: (False, True, True),
     ToolKind.DELETE: (False, True, True),
 }
-
-WRITE_TOOLS = [(c, n) for c in SERVERS for n, k in c.kinds.items() if k is not ToolKind.READ]
-
-
-def _payload(result: CallToolResult) -> dict[str, Any]:
-    block = result.content[0]
-    assert isinstance(block, TextContent)
-    loaded: dict[str, Any] = json.loads(block.text)
-    return loaded
 
 
 @pytest.fixture(autouse=True)
@@ -101,13 +100,13 @@ async def _refused_call(
 
 def _assert_refused(result: CallToolResult, connections: list[bytes]) -> None:
     assert result.isError is True
-    body = _payload(result)
-    assert body["outcome"] == "refused"
-    assert "YZEL_READ_ONLY" in body["message"]
+    out = body(result)
+    assert out["outcome"] == "refused"
+    assert "YZEL_READ_ONLY" in out["message"]
     assert connections == [], "a request reached the backend"
 
 
-@pytest.mark.parametrize(("case", "tool"), WRITE_TOOLS, ids=lambda v: getattr(v, "id", v))
+@pytest.mark.parametrize(("case", "tool"), WRITE_CASES, ids=lambda v: getattr(v, "id", v))
 async def test_read_only_mode_refuses_a_hidden_write_tool_without_touching_the_backend(
     case: ServerCase, tool: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

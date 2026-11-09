@@ -10,6 +10,7 @@ import httpx
 import pytest
 from mcp.types import CallToolResult, Tool
 
+from tests.harness import body
 from yzel.core import writes
 from yzel.core.tools import ToolKind, make_tool
 from yzel.core.writes import run_write
@@ -42,13 +43,6 @@ def _fresh_guard() -> Iterator[None]:
     writes.reset_guard()
     yield
     writes.reset_guard()
-
-
-def body(result: CallToolResult) -> dict[str, Any]:
-    first = result.content[0]
-    assert first.type == "text"
-    parsed: dict[str, Any] = json.loads(first.text)
-    return parsed
 
 
 class Spy:

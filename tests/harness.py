@@ -33,13 +33,13 @@ async def serving(app: Starlette) -> AsyncIterator[str]:
         await task
 
 
-def committing_then_stalling(committed: list[dict[str, Any]], reply: Any = None) -> Any:
+def committing_then_stalling(committed: list[dict[str, Any]]) -> Any:
     """A route that records the request body (the write is committed), then answers too late."""
 
     async def route(request: Request) -> JSONResponse:
         committed.append(await request.json())
         await asyncio.sleep(STALL_SECONDS)
-        return JSONResponse({"ok": True, "result": {}} if reply is None else reply)
+        return JSONResponse({"ok": True, "result": {}})
 
     return route
 

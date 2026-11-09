@@ -319,6 +319,9 @@ SERVERS = [
 ]
 
 
+WRITE_CASES = [(c, n) for c in SERVERS for n, k in c.kinds.items() if k is not ToolKind.READ]
+CASES_BY_ID = {c.id: c for c in SERVERS}
+
 _BAD_REQUEST_BODY = b'{"message": "boom!!!"}'
 # Raw HTTP reply for `watch_backend`: every connector turns a 400 into its typed error.
 BAD_REQUEST = (
