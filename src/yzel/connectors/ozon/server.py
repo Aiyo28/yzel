@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from mcp.server import Server
@@ -18,6 +19,7 @@ from yzel.core.outcome import error_result
 from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import OzonCredential
 from yzel.core.vault import CredentialVault
+from yzel.core.writes import run_write
 
 from .client import OzonClient, OzonError
 
@@ -216,6 +218,22 @@ def _as_text(payload: Any) -> list[TextContent]:
     return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]
 
 
+_TOOLS_BY_NAME = {t.name: t for t in TOOLS}
+
+
+def _write(
+    name: str, arguments: dict[str, Any], call: Callable[[], Awaitable[Any]]
+) -> Awaitable[CallToolResult]:
+    """Run one Ozon write through the write runner."""
+    return run_write(
+        _TOOLS_BY_NAME[name],
+        arguments,
+        call,
+        error_types=(OzonError,),
+        check_tool=None,
+    )
+
+
 @server.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] | CallToolResult:
     # First, before any client or credential is touched: hiding tools in list_tools is not enough.
@@ -249,10 +267,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             return _as_text(await client.get_stocks(arguments["skus"]))
 
         if name == "ozon_update_stocks":
-            return _as_text(await client.update_stocks(arguments["stocks"]))
+            return await _write(name, arguments, lambda: client.update_stocks(arguments["stocks"]))
 
         if name == "ozon_update_prices":
-            return _as_text(await client.update_prices(arguments["prices"]))
+            return await _write(name, arguments, lambda: client.update_prices(arguments["prices"]))
 
         if name == "ozon_unfulfilled":
             return _as_text(

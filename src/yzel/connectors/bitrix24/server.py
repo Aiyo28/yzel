@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from mcp.server import Server
@@ -19,6 +20,7 @@ from yzel.core.outcome import error_result
 from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import Bitrix24Credential
 from yzel.core.vault import CredentialVault
+from yzel.core.writes import run_write
 
 from .client import Bitrix24Client, Bitrix24Error
 
@@ -255,6 +257,22 @@ def _as_text(payload: Any) -> list[TextContent]:
     return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]
 
 
+_TOOLS_BY_NAME = {t.name: t for t in TOOLS}
+
+
+def _write(
+    name: str, arguments: dict[str, Any], call: Callable[[], Awaitable[Any]]
+) -> Awaitable[CallToolResult]:
+    """Run one Bitrix24 write through the write runner."""
+    return run_write(
+        _TOOLS_BY_NAME[name],
+        arguments,
+        call,
+        error_types=(Bitrix24Error,),
+        check_tool="bitrix24_crm_list",
+    )
+
+
 @server.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] | CallToolResult:
     """Handle tool calls."""
@@ -287,13 +305,15 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             entity_type = arguments["entity"]
             meta = _CRM_ENTITIES[entity_type]
             method = getattr(client, meta["create_method"])
-            return _as_text(await method(arguments["fields"]))
+            return await _write(name, arguments, lambda: method(arguments["fields"]))
 
         if name == "bitrix24_crm_update":
             entity_type = arguments["entity"]
             meta = _CRM_ENTITIES[entity_type]
             method = getattr(client, meta["update_method"])
-            return _as_text(await method(arguments["id"], arguments["fields"]))
+            return await _write(
+                name, arguments, lambda: method(arguments["id"], arguments["fields"])
+            )
 
         if name == "bitrix24_tasks_list":
             return _as_text(

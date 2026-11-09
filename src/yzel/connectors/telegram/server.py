@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from mcp.server import Server
@@ -18,6 +19,7 @@ from yzel.core.outcome import error_result
 from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import TelegramCredential
 from yzel.core.vault import CredentialVault
+from yzel.core.writes import run_write
 
 from .client import TelegramClient, TelegramError
 
@@ -215,6 +217,22 @@ def _as_text(payload: Any) -> list[TextContent]:
     return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]
 
 
+_TOOLS_BY_NAME = {t.name: t for t in TOOLS}
+
+
+def _write(
+    name: str, arguments: dict[str, Any], call: Callable[[], Awaitable[Any]]
+) -> Awaitable[CallToolResult]:
+    """Run one Telegram write through the write runner."""
+    return run_write(
+        _TOOLS_BY_NAME[name],
+        arguments,
+        call,
+        error_types=(TelegramError,),
+        check_tool=None,
+    )
+
+
 @server.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] | CallToolResult:
     # First, before any client or credential is touched: hiding tools in list_tools is not enough.
@@ -227,81 +245,107 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] |
             return _as_text(await client.get_me())
 
         if name == "tg_send_message":
-            return _as_text(
-                await client.send_message(
+            return await _write(
+                name,
+                arguments,
+                lambda: client.send_message(
                     chat_id=arguments["chat_id"],
                     text=arguments["text"],
                     parse_mode=arguments.get("parse_mode"),
                     reply_to_message_id=arguments.get("reply_to_message_id"),
                     reply_markup=arguments.get("reply_markup"),
                     disable_web_page_preview=arguments.get("disable_web_page_preview"),
-                )
+                ),
             )
 
         if name == "tg_send_photo":
-            return _as_text(
-                await client.send_photo(
+            return await _write(
+                name,
+                arguments,
+                lambda: client.send_photo(
                     chat_id=arguments["chat_id"],
                     photo=arguments["photo"],
                     caption=arguments.get("caption"),
                     parse_mode=arguments.get("parse_mode"),
-                )
+                ),
             )
 
         if name == "tg_send_document":
-            return _as_text(
-                await client.send_document(
+            return await _write(
+                name,
+                arguments,
+                lambda: client.send_document(
                     chat_id=arguments["chat_id"],
                     document=arguments["document"],
                     caption=arguments.get("caption"),
                     parse_mode=arguments.get("parse_mode"),
-                )
+                ),
             )
 
         if name == "tg_edit_message":
-            return _as_text(
-                await client.edit_message_text(
+            return await _write(
+                name,
+                arguments,
+                lambda: client.edit_message_text(
                     chat_id=arguments["chat_id"],
                     message_id=arguments["message_id"],
                     text=arguments["text"],
                     parse_mode=arguments.get("parse_mode"),
-                )
+                ),
             )
 
         if name == "tg_delete_message":
-            ok = await client.delete_message(arguments["chat_id"], arguments["message_id"])
-            return [TextContent(type="text", text="Удалено" if ok else "Не удалось удалить")]
+
+            async def delete_message() -> str:
+                ok = await client.delete_message(arguments["chat_id"], arguments["message_id"])
+                return "Удалено" if ok else "Не удалось удалить"
+
+            return await _write(name, arguments, delete_message)
 
         if name == "tg_answer_callback":
-            ok = await client.answer_callback_query(
-                arguments["callback_query_id"],
-                text=arguments.get("text"),
-                show_alert=arguments.get("show_alert", False),
-            )
-            return [TextContent(type="text", text="OK" if ok else "Ошибка")]
+
+            async def answer_callback() -> str:
+                ok = await client.answer_callback_query(
+                    arguments["callback_query_id"],
+                    text=arguments.get("text"),
+                    show_alert=arguments.get("show_alert", False),
+                )
+                return "OK" if ok else "Ошибка"
+
+            return await _write(name, arguments, answer_callback)
 
         if name == "tg_get_updates":
-            return _as_text(
-                await client.get_updates(
+            return await _write(
+                name,
+                arguments,
+                lambda: client.get_updates(
                     offset=arguments.get("offset"),
                     limit=arguments.get("limit", 100),
                     timeout=arguments.get("timeout", 0),
                     allowed_updates=arguments.get("allowed_updates"),
-                )
+                ),
             )
 
         if name == "tg_set_webhook":
-            ok = await client.set_webhook(
-                url=arguments["url"],
-                secret_token=arguments.get("secret_token"),
-                allowed_updates=arguments.get("allowed_updates"),
-                drop_pending_updates=arguments.get("drop_pending_updates", False),
-            )
-            return [TextContent(type="text", text="Webhook установлен" if ok else "Ошибка")]
+
+            async def set_webhook() -> str:
+                ok = await client.set_webhook(
+                    url=arguments["url"],
+                    secret_token=arguments.get("secret_token"),
+                    allowed_updates=arguments.get("allowed_updates"),
+                    drop_pending_updates=arguments.get("drop_pending_updates", False),
+                )
+                return "Webhook установлен" if ok else "Ошибка"
+
+            return await _write(name, arguments, set_webhook)
 
         if name == "tg_delete_webhook":
-            ok = await client.delete_webhook(arguments.get("drop_pending_updates", False))
-            return [TextContent(type="text", text="Webhook удалён" if ok else "Ошибка")]
+
+            async def delete_webhook() -> str:
+                ok = await client.delete_webhook(arguments.get("drop_pending_updates", False))
+                return "Webhook удалён" if ok else "Ошибка"
+
+            return await _write(name, arguments, delete_webhook)
 
         if name == "tg_get_webhook_info":
             return _as_text(await client.get_webhook_info())

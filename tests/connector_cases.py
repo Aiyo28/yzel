@@ -26,6 +26,7 @@ from yzel.connectors.iiko import server as iiko_server
 from yzel.connectors.moysklad import server as moysklad_server
 from yzel.connectors.moysklad.client import MoyskladClient
 from yzel.connectors.onec import server as onec_server
+from yzel.connectors.onec.odata import OneCODataClient
 from yzel.connectors.ozon import server as ozon_server
 from yzel.connectors.telegram import server as telegram_server
 from yzel.connectors.wildberries import client as wildberries_client
@@ -58,6 +59,8 @@ class ServerCase:
     # `http://127.0.0.1:port`; `home` is a scratch directory) and resets any per-process
     # state it keeps, so every test starts from a cold server.
     point_at_backend: Callable[[pytest.MonkeyPatch, str, Path], None]
+    # Minimal valid arguments for every non-READ tool, enough to put a request on the wire.
+    write_calls: dict[str, dict[str, Any]]
 
 
 def _seed_vault(mp: pytest.MonkeyPatch, home: Path, credential: ServiceCredential) -> None:
@@ -68,10 +71,12 @@ def _seed_vault(mp: pytest.MonkeyPatch, home: Path, credential: ServiceCredentia
 
 
 def _point_onec(mp: pytest.MonkeyPatch, url: str, home: Path) -> None:
-    mp.setattr(onec_server, "_client", None)
-    mp.setenv("YZEL_1C_URL", f"{url}/odata/standard.odata")
-    mp.setenv("YZEL_1C_USERNAME", "admin")
-    mp.setenv("YZEL_1C_PASSWORD", "test")
+    # Hand the server a ready client: a cold start runs schema discovery first, and a failing
+    # `$metadata` would end the call before the tool under test is reached.
+    mp.setattr(
+        onec_server, "_client", OneCODataClient(f"{url}/odata/standard.odata", "admin", "test")
+    )
+    mp.setattr(onec_server, "_schema", [])
 
 
 def _point_amocrm(mp: pytest.MonkeyPatch, url: str, home: Path) -> None:
@@ -153,6 +158,11 @@ SERVERS = [
         },
         read_call=("onec_count", {"entity": "Catalog_Контрагенты"}),
         point_at_backend=_point_onec,
+        write_calls={
+            "onec_create": {"entity": "Catalog_Контрагенты", "data": {"Description": "A"}},
+            "onec_update": {"entity": "Catalog_Контрагенты", "key": "k", "data": {}},
+            "onec_delete": {"entity": "Catalog_Контрагенты", "key": "k"},
+        },
     ),
     ServerCase(
         id="amocrm",
@@ -167,6 +177,10 @@ SERVERS = [
         },
         read_call=("amocrm_account", {}),
         point_at_backend=_point_amocrm,
+        write_calls={
+            "amocrm_create": {"entity": "lead", "items": [{"name": "A"}]},
+            "amocrm_update": {"entity": "lead", "id": 1, "fields": {"name": "B"}},
+        },
     ),
     ServerCase(
         id="bitrix24",
@@ -181,6 +195,10 @@ SERVERS = [
         },
         read_call=("bitrix24_tasks_list", {}),
         point_at_backend=_point_bitrix24,
+        write_calls={
+            "bitrix24_crm_create": {"entity": "lead", "fields": {"TITLE": "A"}},
+            "bitrix24_crm_update": {"entity": "lead", "id": 1, "fields": {"TITLE": "B"}},
+        },
     ),
     ServerCase(
         id="moysklad",
@@ -195,6 +213,10 @@ SERVERS = [
         },
         read_call=("moysklad_organizations", {}),
         point_at_backend=_point_moysklad,
+        write_calls={
+            "moysklad_create": {"entity": "counterparty", "fields": {"name": "A"}},
+            "moysklad_update": {"entity": "counterparty", "id": "i", "fields": {"name": "B"}},
+        },
     ),
     ServerCase(
         id="iiko",
@@ -212,6 +234,13 @@ SERVERS = [
         },
         read_call=("iiko_organizations", {}),
         point_at_backend=_point_iiko,
+        write_calls={
+            "iiko_create_delivery": {
+                "organization_id": "o",
+                "terminal_group_id": "g",
+                "order": {"phone": "+77001112233"},
+            },
+        },
     ),
     ServerCase(
         id="ozon",
@@ -231,6 +260,10 @@ SERVERS = [
         },
         read_call=("ozon_list_warehouses", {}),
         point_at_backend=_point_ozon,
+        write_calls={
+            "ozon_update_stocks": {"stocks": [{"offer_id": "A", "stock": 1, "warehouse_id": 1}]},
+            "ozon_update_prices": {"prices": [{"offer_id": "A", "price": "100"}]},
+        },
     ),
     ServerCase(
         id="wildberries",
@@ -249,6 +282,9 @@ SERVERS = [
         },
         read_call=("wb_seller_info", {}),
         point_at_backend=_point_wildberries,
+        write_calls={
+            "wb_update_stocks": {"warehouse_id": 1, "stocks": [{"sku": "1", "amount": 1}]},
+        },
     ),
     ServerCase(
         id="telegram",
@@ -269,8 +305,28 @@ SERVERS = [
         },
         read_call=("tg_get_me", {}),
         point_at_backend=_point_telegram,
+        write_calls={
+            "tg_send_message": {"chat_id": 1, "text": "hi"},
+            "tg_send_photo": {"chat_id": 1, "photo": "https://example.com/a.png"},
+            "tg_send_document": {"chat_id": 1, "document": "https://example.com/a.pdf"},
+            "tg_answer_callback": {"callback_query_id": "c"},
+            "tg_edit_message": {"chat_id": 1, "message_id": 2, "text": "hi"},
+            "tg_set_webhook": {"url": "https://example.com/hook"},
+            "tg_get_updates": {},
+            "tg_delete_message": {"chat_id": 1, "message_id": 2},
+            "tg_delete_webhook": {},
+        },
     ),
 ]
+
+
+_BAD_REQUEST_BODY = b'{"message": "boom!!!"}'
+# Raw HTTP reply for `watch_backend`: every connector turns a 400 into its typed error.
+BAD_REQUEST = (
+    b"HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\n"
+    + b"Content-Length: %d\r\nConnection: close\r\n\r\n" % len(_BAD_REQUEST_BODY)
+    + _BAD_REQUEST_BODY
+)
 
 
 @asynccontextmanager

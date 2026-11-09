@@ -16,7 +16,7 @@ import pytest
 from mcp.types import CallToolResult, TextContent, Tool
 
 import yzel.connectors
-from tests.connector_cases import SERVERS, ServerCase, connected, watch_backend
+from tests.connector_cases import BAD_REQUEST, SERVERS, ServerCase, connected, watch_backend
 from yzel.core.tools import ToolKind, kind_of, make_tool
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -142,23 +142,13 @@ async def test_read_only_mode_still_serves_read_tools(
     assert connections, "the read call never reached the backend"
 
 
-# 1C and AmoCRM come back in slice 4 (1C's catch lands in slice 2, AmoCRM's in slice 4).
-TYPED_ERROR_CASES = [c for c in SERVERS if c.id not in {"onec", "amocrm"}]
-_BAD_REQUEST_BODY = b'{"message": "boom!!!"}'
-_BAD_REQUEST = (
-    b"HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\n"
-    + b"Content-Length: %d\r\nConnection: close\r\n\r\n" % len(_BAD_REQUEST_BODY)
-    + _BAD_REQUEST_BODY
-)
-
-
-@pytest.mark.parametrize("case", TYPED_ERROR_CASES, ids=lambda c: c.id)
+@pytest.mark.parametrize("case", SERVERS, ids=lambda c: c.id)
 async def test_a_typed_backend_error_on_a_read_is_an_error_result(
     case: ServerCase, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """The model must see `isError`, not a successful-looking result that says "Ошибка"."""
     tool, arguments = case.read_call
-    async with watch_backend(_BAD_REQUEST) as (url, connections):
+    async with watch_backend(BAD_REQUEST) as (url, connections):
         case.point_at_backend(monkeypatch, url, tmp_path)
         async with connected(case) as session:
             result = await session.call_tool(tool, arguments)

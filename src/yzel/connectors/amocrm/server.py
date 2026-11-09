@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from mcp.server import Server
@@ -15,11 +16,13 @@ from mcp.server.stdio import stdio_server
 from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
+from yzel.core.outcome import error_result
 from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import AmoCRMCredential
 from yzel.core.vault import CredentialVault
+from yzel.core.writes import run_write
 
-from .client import AmoCRMClient
+from .client import AmoCRMAuthError, AmoCRMClient, AmoCRMError
 
 server = Server("yzel-amocrm", version=__version__)
 
@@ -253,66 +256,87 @@ async def list_tools() -> list[Tool]:
     return visible_tools(TOOLS)
 
 
+def _as_text(payload: Any) -> list[TextContent]:
+    return [TextContent(type="text", text=json.dumps(payload, ensure_ascii=False, indent=2))]
+
+
+_TOOLS_BY_NAME = {t.name: t for t in TOOLS}
+
+
+def _write(
+    name: str, arguments: dict[str, Any], call: Callable[[], Awaitable[Any]]
+) -> Awaitable[CallToolResult]:
+    """Run one AmoCRM write through the write runner."""
+    return run_write(
+        _TOOLS_BY_NAME[name],
+        arguments,
+        call,
+        error_types=(AmoCRMError, AmoCRMAuthError),
+        check_tool="amocrm_list",
+    )
+
+
 @server.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] | CallToolResult:
     """Handle tool calls."""
     # First, before any client or credential is touched: hiding tools in list_tools is not enough.
     if (refused := refuse_if_read_only(TOOLS, name)) is not None:
         return refused
-    client = await _ensure_client()
+    try:
+        client = await _ensure_client()
 
-    if name == "amocrm_list":
-        entity_type = arguments["entity"]
-        meta = _ENTITY_TYPES[entity_type]
-        method = getattr(client, meta["list_method"])
-        kwargs: dict[str, Any] = {
-            "limit": arguments.get("limit", 50),
-            "page": arguments.get("page", 1),
-        }
-        if arguments.get("query"):
-            kwargs["query"] = arguments["query"]
-        if arguments.get("with"):
-            kwargs["with_params"] = arguments["with"]
-        result = await method(**kwargs)
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+        if name == "amocrm_list":
+            entity_type = arguments["entity"]
+            meta = _ENTITY_TYPES[entity_type]
+            method = getattr(client, meta["list_method"])
+            kwargs: dict[str, Any] = {
+                "limit": arguments.get("limit", 50),
+                "page": arguments.get("page", 1),
+            }
+            if arguments.get("query"):
+                kwargs["query"] = arguments["query"]
+            if arguments.get("with"):
+                kwargs["with_params"] = arguments["with"]
+            return _as_text(await method(**kwargs))
 
-    elif name == "amocrm_get":
-        entity_type = arguments["entity"]
-        meta = _ENTITY_TYPES[entity_type]
-        method = getattr(client, meta["get_method"])
-        kwargs = {}
-        if arguments.get("with"):
-            kwargs["with_params"] = arguments["with"]
-        result = await method(arguments["id"], **kwargs)
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+        if name == "amocrm_get":
+            entity_type = arguments["entity"]
+            meta = _ENTITY_TYPES[entity_type]
+            method = getattr(client, meta["get_method"])
+            kwargs = {}
+            if arguments.get("with"):
+                kwargs["with_params"] = arguments["with"]
+            return _as_text(await method(arguments["id"], **kwargs))
 
-    elif name == "amocrm_create":
-        entity_type = arguments["entity"]
-        meta = _ENTITY_TYPES[entity_type]
-        method = getattr(client, meta["create_method"])
-        result = await method(arguments["items"])
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+        if name == "amocrm_create":
+            entity_type = arguments["entity"]
+            meta = _ENTITY_TYPES[entity_type]
+            method = getattr(client, meta["create_method"])
+            return await _write(name, arguments, lambda: method(arguments["items"]))
 
-    elif name == "amocrm_update":
-        entity_type = arguments["entity"]
-        meta = _ENTITY_TYPES[entity_type]
-        method = getattr(client, meta["update_method"])
-        result = await method(arguments["id"], arguments["fields"])
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+        if name == "amocrm_update":
+            entity_type = arguments["entity"]
+            meta = _ENTITY_TYPES[entity_type]
+            method = getattr(client, meta["update_method"])
+            return await _write(
+                name, arguments, lambda: method(arguments["id"], arguments["fields"])
+            )
 
-    elif name == "amocrm_pipelines":
-        pipeline_id = arguments.get("pipeline_id")
-        if pipeline_id:
-            result = await client.get_pipeline(pipeline_id)
-        else:
-            result = await client.get_pipelines()
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+        if name == "amocrm_pipelines":
+            pipeline_id = arguments.get("pipeline_id")
+            if pipeline_id:
+                return _as_text(await client.get_pipeline(pipeline_id))
+            return _as_text(await client.get_pipelines())
 
-    elif name == "amocrm_account":
-        result = await client.get_account(with_params=arguments.get("with"))
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+        if name == "amocrm_account":
+            return _as_text(await client.get_account(with_params=arguments.get("with")))
 
-    return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
+        return [TextContent(type="text", text=f"Неизвестный инструмент: {name}")]
+
+    except AmoCRMError as exc:
+        return error_result(f"Ошибка AmoCRM: {exc.detail}")
+    except AmoCRMAuthError as exc:
+        return error_result(f"Ошибка AmoCRM: {exc}")
 
 
 async def main() -> None:
