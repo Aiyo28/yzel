@@ -13,10 +13,11 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel import __version__
 from yzel.core.discovery import discover_schema
+from yzel.core.tools import ToolKind, make_tool, refuse_if_read_only, visible_tools
 from yzel.core.types import OneCCredential, SchemaEntity
 from yzel.core.vault import CredentialVault
 
@@ -85,116 +86,127 @@ async def _ensure_client() -> OneCODataClient:
     return _client
 
 
+TOOLS: list[Tool] = [
+    make_tool(
+        "onec_list_entities",
+        "Показать доступные объекты в 1С (справочники, документы, регистры)",
+        {"type": "object", "properties": {}},
+        ToolKind.READ,
+    ),
+    make_tool(
+        "onec_query",
+        (
+            "Запросить данные из 1С по имени объекта. "
+            "Примеры: Catalog_Контрагенты, Document_РеализацияТоваровУслуг"
+        ),
+        {
+            "type": "object",
+            "properties": {
+                "entity": {
+                    "type": "string",
+                    "description": "Имя объекта OData (например, Catalog_Контрагенты)",
+                },
+                "top": {
+                    "type": "integer",
+                    "description": "Максимальное количество записей",
+                    "default": 20,
+                },
+                "filter": {"type": "string", "description": "OData $filter выражение"},
+                "select": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Поля для выборки",
+                },
+            },
+            "required": ["entity"],
+        },
+        ToolKind.READ,
+    ),
+    make_tool(
+        "onec_get",
+        "Получить одну запись из 1С по GUID",
+        {
+            "type": "object",
+            "properties": {
+                "entity": {"type": "string", "description": "Имя объекта OData"},
+                "key": {"type": "string", "description": "GUID записи"},
+            },
+            "required": ["entity", "key"],
+        },
+        ToolKind.READ,
+    ),
+    make_tool(
+        "onec_schema",
+        "Показать поля конкретного объекта 1С",
+        {
+            "type": "object",
+            "properties": {
+                "entity": {"type": "string", "description": "Имя объекта OData"},
+            },
+            "required": ["entity"],
+        },
+        ToolKind.READ,
+    ),
+    make_tool(
+        "onec_count",
+        "Подсчитать количество записей в объекте 1С",
+        {
+            "type": "object",
+            "properties": {
+                "entity": {"type": "string", "description": "Имя объекта OData"},
+                "filter": {"type": "string", "description": "OData $filter выражение"},
+            },
+            "required": ["entity"],
+        },
+        ToolKind.READ,
+    ),
+    make_tool(
+        "onec_create",
+        "Создать новую запись в 1С",
+        {
+            "type": "object",
+            "properties": {
+                "entity": {"type": "string", "description": "Имя объекта OData"},
+                "data": {"type": "object", "description": "Поля новой записи"},
+            },
+            "required": ["entity", "data"],
+        },
+        ToolKind.CREATE,
+    ),
+    make_tool(
+        "onec_update",
+        "Обновить существующую запись в 1С (PATCH)",
+        {
+            "type": "object",
+            "properties": {
+                "entity": {"type": "string", "description": "Имя объекта OData"},
+                "key": {"type": "string", "description": "GUID записи"},
+                "data": {"type": "object", "description": "Изменяемые поля"},
+            },
+            "required": ["entity", "key", "data"],
+        },
+        ToolKind.UPDATE,
+    ),
+    make_tool(
+        "onec_delete",
+        "Пометить запись на удаление в 1С (устанавливает DeletionMark)",
+        {
+            "type": "object",
+            "properties": {
+                "entity": {"type": "string", "description": "Имя объекта OData"},
+                "key": {"type": "string", "description": "GUID записи"},
+            },
+            "required": ["entity", "key"],
+        },
+        ToolKind.DELETE,
+    ),
+]
+
+
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    """List available 1C tools."""
-    return [
-        Tool(
-            name="onec_list_entities",
-            description="Показать доступные объекты в 1С (справочники, документы, регистры)",
-            inputSchema={"type": "object", "properties": {}},
-        ),
-        Tool(
-            name="onec_query",
-            description=(
-                "Запросить данные из 1С по имени объекта. "
-                "Примеры: Catalog_Контрагенты, Document_РеализацияТоваровУслуг"
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {
-                        "type": "string",
-                        "description": "Имя объекта OData (например, Catalog_Контрагенты)",
-                    },
-                    "top": {
-                        "type": "integer",
-                        "description": "Максимальное количество записей",
-                        "default": 20,
-                    },
-                    "filter": {"type": "string", "description": "OData $filter выражение"},
-                    "select": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Поля для выборки",
-                    },
-                },
-                "required": ["entity"],
-            },
-        ),
-        Tool(
-            name="onec_get",
-            description="Получить одну запись из 1С по GUID",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {"type": "string", "description": "Имя объекта OData"},
-                    "key": {"type": "string", "description": "GUID записи"},
-                },
-                "required": ["entity", "key"],
-            },
-        ),
-        Tool(
-            name="onec_schema",
-            description="Показать поля конкретного объекта 1С",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {"type": "string", "description": "Имя объекта OData"},
-                },
-                "required": ["entity"],
-            },
-        ),
-        Tool(
-            name="onec_count",
-            description="Подсчитать количество записей в объекте 1С",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {"type": "string", "description": "Имя объекта OData"},
-                    "filter": {"type": "string", "description": "OData $filter выражение"},
-                },
-                "required": ["entity"],
-            },
-        ),
-        Tool(
-            name="onec_create",
-            description="Создать новую запись в 1С",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {"type": "string", "description": "Имя объекта OData"},
-                    "data": {"type": "object", "description": "Поля новой записи"},
-                },
-                "required": ["entity", "data"],
-            },
-        ),
-        Tool(
-            name="onec_update",
-            description="Обновить существующую запись в 1С (PATCH)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {"type": "string", "description": "Имя объекта OData"},
-                    "key": {"type": "string", "description": "GUID записи"},
-                    "data": {"type": "object", "description": "Изменяемые поля"},
-                },
-                "required": ["entity", "key", "data"],
-            },
-        ),
-        Tool(
-            name="onec_delete",
-            description="Пометить запись на удаление в 1С (устанавливает DeletionMark)",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "entity": {"type": "string", "description": "Имя объекта OData"},
-                    "key": {"type": "string", "description": "GUID записи"},
-                },
-                "required": ["entity", "key"],
-            },
-        ),
-    ]
+    """List available 1C tools (only the read ones in read-only mode)."""
+    return visible_tools(TOOLS)
 
 
 def _as_text(payload: Any) -> list[TextContent]:
@@ -202,8 +214,11 @@ def _as_text(payload: Any) -> list[TextContent]:
 
 
 @server.call_tool()
-async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent] | CallToolResult:
     """Handle tool calls."""
+    # First, before any client or credential is touched: hiding tools in list_tools is not enough.
+    if (refused := refuse_if_read_only(TOOLS, name)) is not None:
+        return refused
     try:
         client = await _ensure_client()
 

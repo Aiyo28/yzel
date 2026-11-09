@@ -23,7 +23,9 @@ dependencies = [
     # Upper bound is load-bearing: mcp 2.x removed `Server.list_tools`, and every
     # connector server module fails at import against it. Unbounded, `uvx` resolved
     # 2.1.1 and 0.1.1 was dead on arrival for every user. Lift only with the 2.x port.
-    "mcp>=1.0.0,<2.0.0",
+    # Lower bound 1.19.0: first release whose low-level `call_tool` handler passes a returned
+    # `CallToolResult` through as-is (outcome envelope, isError); `ToolAnnotations` is older.
+    "mcp>=1.19.0,<2.0.0",
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
     "cryptography>=42.0.0",

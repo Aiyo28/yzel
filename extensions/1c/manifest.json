@@ -26,7 +26,8 @@
       "env": {
         "YZEL_1C_URL": "${user_config.onec_url}",
         "YZEL_1C_USERNAME": "${user_config.onec_username}",
-        "YZEL_1C_PASSWORD": "${user_config.onec_password}"
+        "YZEL_1C_PASSWORD": "${user_config.onec_password}",
+        "YZEL_READ_ONLY": "${user_config.read_only}"
       }
     }
   },
@@ -60,6 +61,13 @@
       "sensitive": true,
       "required": false,
       "default": ""
+    },
+    "read_only": {
+      "type": "boolean",
+      "title": "Только чтение / Read-only",
+      "description": "Запретить создание, изменение и удаление записей в 1С. / Block creating, changing and deleting 1C records.",
+      "required": false,
+      "default": true
     }
   },
   "compatibility": {
