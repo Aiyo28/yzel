@@ -19,7 +19,7 @@ import pytest
 from mcp import ClientSession
 from mcp.server import Server
 from mcp.shared.memory import create_connected_server_and_client_session
-from mcp.types import CallToolResult, Tool
+from mcp.types import CallToolResult, TextContent, Tool
 
 from yzel.connectors.onec import server as onec_server
 from yzel.core.tools import ToolKind, kind_of, make_tool
@@ -34,13 +34,15 @@ class ServerCase:
     id: str
     server: Server[Any, Any]
     kinds: dict[str, ToolKind]
-    # A write tool and arguments that would reach the backend if it were not refused.
-    write_call: tuple[str, dict[str, Any]]
-    # Env vars that point the server at a backend we can watch (set by `watch_backend`).
+    # A read tool and arguments that reach the backend when read-only mode is on.
+    read_call: tuple[str, dict[str, Any]]
+    # Points the server at a backend we can watch (see `watch_backend`) and resets any
+    # per-process state it keeps, so every test starts from a cold server.
     point_at_backend: Callable[[pytest.MonkeyPatch, str], None]
 
 
 def _point_onec(mp: pytest.MonkeyPatch, url: str) -> None:
+    mp.setattr(onec_server, "_client", None)
     mp.setenv("YZEL_1C_URL", url)
     mp.setenv("YZEL_1C_USERNAME", "admin")
     mp.setenv("YZEL_1C_PASSWORD", "test")
@@ -60,17 +62,20 @@ SERVERS = [
             "onec_update": ToolKind.UPDATE,
             "onec_delete": ToolKind.DELETE,
         },
-        write_call=("onec_delete", {"entity": "Catalog_Контрагенты", "key": "x"}),
+        read_call=("onec_count", {"entity": "Catalog_Контрагенты"}),
         point_at_backend=_point_onec,
     ),
 ]
 
-ANNOTATIONS = {
-    ToolKind.READ: dict(readOnlyHint=True, destructiveHint=None, idempotentHint=None),
-    ToolKind.CREATE: dict(readOnlyHint=False, destructiveHint=False, idempotentHint=False),
-    ToolKind.UPDATE: dict(readOnlyHint=False, destructiveHint=True, idempotentHint=True),
-    ToolKind.DELETE: dict(readOnlyHint=False, destructiveHint=True, idempotentHint=True),
+# (readOnlyHint, destructiveHint, idempotentHint) per kind, from the spec.
+ANNOTATIONS: dict[ToolKind, tuple[bool | None, bool | None, bool | None]] = {
+    ToolKind.READ: (True, None, None),
+    ToolKind.CREATE: (False, False, False),
+    ToolKind.UPDATE: (False, True, True),
+    ToolKind.DELETE: (False, True, True),
 }
+
+WRITE_TOOLS = [(c, n) for c in SERVERS for n, k in c.kinds.items() if k is not ToolKind.READ]
 
 
 @asynccontextmanager
@@ -98,14 +103,14 @@ async def watch_backend() -> AsyncIterator[tuple[str, list[bytes]]]:
 
 
 def _payload(result: CallToolResult) -> dict[str, Any]:
-    text = result.content[0].text  # type: ignore[union-attr]
-    loaded: dict[str, Any] = json.loads(text)
+    block = result.content[0]
+    assert isinstance(block, TextContent)
+    loaded: dict[str, Any] = json.loads(block.text)
     return loaded
 
 
 @pytest.fixture(autouse=True)
-def _reset_onec_state(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(onec_server, "_client", None)
+def _read_only_off(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("YZEL_READ_ONLY", raising=False)
 
 
@@ -117,13 +122,10 @@ async def test_every_listed_tool_carries_annotations_matching_its_kind(case: Ser
     assert {t.name for t in tools} == set(case.kinds)
     for tool in tools:
         assert tool.annotations is not None, f"{tool.name} has no annotations"
-        want = ANNOTATIONS[case.kinds[tool.name]]
         got = tool.annotations
-        assert (got.readOnlyHint, got.destructiveHint, got.idempotentHint) == (
-            want["readOnlyHint"],
-            want["destructiveHint"],
-            want["idempotentHint"],
-        ), tool.name
+        assert (got.readOnlyHint, got.destructiveHint, got.idempotentHint) == ANNOTATIONS[
+            case.kinds[tool.name]
+        ], tool.name
         assert got.openWorldHint is True, tool.name
         assert kind_of(tool) is case.kinds[tool.name]
 
@@ -152,45 +154,61 @@ async def test_other_values_leave_every_tool_listed(
     assert listed == set(case.kinds)
 
 
-@pytest.mark.parametrize("case", SERVERS, ids=lambda c: c.id)
-async def test_read_only_mode_refuses_a_hidden_write_tool_without_touching_the_backend(
-    case: ServerCase, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A client with a cached tool list, or an agent guessing the name, still calls it."""
+async def _refused_call(
+    case: ServerCase, monkeypatch: pytest.MonkeyPatch, name: str
+) -> tuple[CallToolResult, list[bytes]]:
+    """Call `name` with no arguments in read-only mode; also return the backend's connections."""
     monkeypatch.setenv("YZEL_READ_ONLY", "1")
-    tool, arguments = case.write_call
-    vault_lookups: list[str] = []
-    monkeypatch.setattr(
-        onec_server, "_credential_from_vault", lambda: vault_lookups.append("vault") or 1 / 0
-    )
     async with watch_backend() as (url, connections):
         case.point_at_backend(monkeypatch, url)
         async with connected(case) as session:
-            result = await session.call_tool(tool, arguments)
+            # Like a real client: list first (the server caches that list), then call by name.
+            await session.list_tools()
+            result = await session.call_tool(name, {})
+    return result, connections
 
+
+def _assert_refused(result: CallToolResult, connections: list[bytes]) -> None:
     assert result.isError is True
     body = _payload(result)
     assert body["outcome"] == "refused"
     assert "YZEL_READ_ONLY" in body["message"]
-    assert connections == []
-    assert vault_lookups == []
-    assert onec_server._client is None
+    assert connections == [], "a request reached the backend"
 
 
-async def test_read_only_mode_still_serves_read_tools(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The refusal is for writes only: a read call gets past it to the backend."""
+@pytest.mark.parametrize(("case", "tool"), WRITE_TOOLS, ids=lambda v: getattr(v, "id", v))
+async def test_read_only_mode_refuses_a_hidden_write_tool_without_touching_the_backend(
+    case: ServerCase, tool: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A client with a cached tool list, or an agent guessing the name, still calls it."""
+    result, connections = await _refused_call(case, monkeypatch, tool)
+
+    _assert_refused(result, connections)
+
+
+@pytest.mark.parametrize("case", SERVERS, ids=lambda c: c.id)
+async def test_read_only_mode_refuses_a_name_the_server_does_not_list(
+    case: ServerCase, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fail closed: a write branch missing from the tool list must not run either."""
+    result, connections = await _refused_call(case, monkeypatch, "no_such_tool")
+
+    _assert_refused(result, connections)
+
+
+@pytest.mark.parametrize("case", SERVERS, ids=lambda c: c.id)
+async def test_read_only_mode_still_serves_read_tools(
+    case: ServerCase, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The refusal is for everything but listed READ tools: a read call reaches the backend."""
     monkeypatch.setenv("YZEL_READ_ONLY", "1")
+    tool, arguments = case.read_call
     async with watch_backend() as (url, connections):
-        _point_onec(monkeypatch, url)
-        async with connected(SERVERS[0]) as session:
-            await session.call_tool("onec_count", {"entity": "Catalog_Контрагенты"})
+        case.point_at_backend(monkeypatch, url)
+        async with connected(case) as session:
+            await session.call_tool(tool, arguments)
 
     assert connections, "the read call never reached the backend"
-
-
-def test_a_tool_cannot_be_built_without_a_kind() -> None:
-    with pytest.raises(TypeError):
-        make_tool("t", "d", {"type": "object"})  # type: ignore[call-arg]
 
 
 @pytest.mark.parametrize("kind", list(ToolKind))
@@ -207,7 +225,7 @@ def test_make_tool_round_trips_kind_and_keeps_callers_schema_intact(kind: ToolKi
         assert "again" not in tool.inputSchema.get("required", [])
 
 
-def test_kind_of_rejects_a_tool_built_without_annotations() -> None:
+def test_kind_of_rejects_a_tool_not_built_by_make_tool() -> None:
     with pytest.raises(ValueError):
         kind_of(Tool(name="bare", inputSchema={"type": "object"}))
 

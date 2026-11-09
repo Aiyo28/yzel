@@ -116,8 +116,8 @@ the conservative reading costs one check, the other costs a duplicate.
 **Modules**
 
 - **Tool registry (`yzel.core`)**: builds a `Tool` from name, description, schema and kind;
-  there is no way to build one without a kind. Answers "is read-only mode on" (env, read once at
-  startup) and filters a tool list for it. Create tools get the optional `again` boolean added to
+  there is no way to build one without a kind. Answers "is read-only mode on" (read from the env
+  on each call) and filters a tool list for it. Create tools get the optional `again` boolean added to
   their schema here, not by hand.
 - **Write runner (`yzel.core`)**: one entry point that takes the tool's kind, its arguments, the
   name of its check tool (or none), and the client call. It runs the duplicate guard, runs the

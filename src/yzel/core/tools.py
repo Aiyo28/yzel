@@ -1,9 +1,10 @@
 """Tool registry: every tool is built with a `ToolKind`, and the kind drives safety.
 
 `make_tool` is the only way servers build a `Tool`, and it requires a kind, so a tool cannot
-ship without MCP annotations. The annotations are the single source of truth: `kind_of` reads
-the kind back from them. Read-only mode (`YZEL_READ_ONLY`) hides non-READ tools from the
-list and, because a client may hold a cached list or guess a name, refuses their calls too.
+ship without MCP annotations. The kind is stored in the tool's `_meta` (`kind_of` reads only
+that); the annotations are derived from it for clients. Read-only mode (`YZEL_READ_ONLY`)
+hides non-READ tools from the list and fails closed in the handler: only listed READ tools
+may run, because a client may hold a cached list or guess a name.
 """
 
 from __future__ import annotations
@@ -56,31 +57,24 @@ def make_tool(name: str, description: str, input_schema: dict[str, Any], kind: T
     """Build a `Tool` annotated for `kind`. CREATE tools also get an optional `again` flag."""
     schema = input_schema
     if kind is ToolKind.CREATE:
-        properties = {**input_schema.get("properties", {}), "again": _AGAIN_PROPERTY}
+        properties = {**input_schema.get("properties", {}), "again": dict(_AGAIN_PROPERTY)}
         schema = {**input_schema, "properties": properties}
     return Tool(
         name=name,
         description=description,
         inputSchema=schema,
         annotations=_ANNOTATIONS[kind].model_copy(),
-        # The spec's hint table gives UPDATE and DELETE identical annotations, so DELETE is
-        # marked in `_meta` to let `kind_of` tell them apart. Safety never depends on it.
-        _meta={_KIND_META: kind.value} if kind is ToolKind.DELETE else None,
+        _meta={_KIND_META: kind.value},
     )
 
 
 def kind_of(tool: Tool) -> ToolKind:
-    """Recover a tool's kind from its annotations."""
-    ann = tool.annotations
-    if ann is None:
-        raise ValueError(f"У инструмента {tool.name} нет аннотаций")
-    if ann.readOnlyHint:
-        return ToolKind.READ
-    if ann.destructiveHint is False:
-        return ToolKind.CREATE
-    if tool.meta and tool.meta.get(_KIND_META) == ToolKind.DELETE:
-        return ToolKind.DELETE
-    return ToolKind.UPDATE
+    """The kind `make_tool` stamped on the tool; raises if it was built another way."""
+    raw = str((tool.meta or {}).get(_KIND_META))
+    try:
+        return ToolKind(raw)
+    except ValueError:
+        raise ValueError(f"У инструмента {tool.name} нет известного вида ({_KIND_META})") from None
 
 
 def read_only_enabled() -> bool:
@@ -95,13 +89,12 @@ def visible_tools(tools: Sequence[Tool]) -> list[Tool]:
 
 
 def refuse_if_read_only(tools: Sequence[Tool], name: str) -> CallToolResult | None:
-    """A `refused` result when read-only mode is on and `name` is a write tool, else None."""
+    """None if the call may run; read-only: `refused` unless `name` is a listed READ tool."""
     if not read_only_enabled():
         return None
-    for tool in tools:
-        if tool.name == name and kind_of(tool) is not ToolKind.READ:
-            return outcome_result(
-                Outcome.REFUSED,
-                f"Включён режим «только чтение» ({READ_ONLY_ENV}). Запрос не отправлен.",
-            )
-    return None
+    if any(t.name == name and kind_of(t) is ToolKind.READ for t in tools):
+        return None
+    return outcome_result(
+        Outcome.REFUSED,
+        f"Инструмент недоступен в режиме «только чтение» ({READ_ONLY_ENV}). Запрос не отправлен.",
+    )
