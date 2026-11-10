@@ -10,7 +10,7 @@ src/yzel/
 │   ├── outcome.py       # Result envelope: write outcomes, error_result, json_text
 │   ├── writes.py        # Write runner (run_write) and duplicate-create guard
 │   ├── types.py         # ServiceCredential + 8 subclasses + EntityRecord + SchemaEntity
-│   ├── vault.py         # SQLite vault, AES-256 at rest, ~/.yzel/store.db
+│   ├── vault.py         # SQLite vault, Fernet (AES-128 + HMAC) at rest, ~/.yzel/store.db
 │   └── discovery.py     # Dynamic schema discovery (1C $metadata streaming parser)
 └── connectors/
     ├── onec/            # 1C Enterprise (OData v3 + JSON)
@@ -39,7 +39,7 @@ Every connector is an independent package with:
 CLI (yzel config add-1c)
   → OneCCredential(host, username, password, is_fresh)
   → CredentialVault.store(connection_id, cred)
-  → SQLite (~/.yzel/store.db) with AES-256-GCM encrypted blob
+  → SQLite (~/.yzel/store.db) with a Fernet-encrypted blob (AES-128-CBC + HMAC-SHA256)
 
 MCP Server startup
   → CredentialVault.list_connections()
@@ -110,7 +110,7 @@ First connection of each service type is selected automatically. Multi-tenant / 
 | MCP SDK | `mcp` (official) | Anthropic reference SDK |
 | HTTP | `httpx` | async, transports support makes mocking clean |
 | Validation | `pydantic` v2 | credential type safety, no manual dict-wrangling |
-| Encryption | `cryptography` (AES-256-GCM) | credential vault at rest |
+| Encryption | `cryptography` Fernet (AES-128-CBC + HMAC-SHA256) | credential vault at rest |
 | CLI | `click` | prompt/hide-input ergonomics |
 | Packaging | `uv` + PEP 621 | fast, reproducible |
 | Tests | `pytest` + `pytest-asyncio` | standard |

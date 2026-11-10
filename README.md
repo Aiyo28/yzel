@@ -114,11 +114,13 @@ yzel config add-iiko        # iiko Cloud
 yzel config list
 ```
 
-Учётные данные хранятся зашифрованными (AES-256) в локальном SQLite-vault `~/.yzel/store.db`. Ничего не отправляется в облако. / Credentials are stored encrypted (AES-256) in a local SQLite vault at `~/.yzel/store.db`. Nothing goes to a cloud.
+Учётные данные хранятся зашифрованными (Fernet: AES-128 + HMAC-SHA256) в локальном SQLite-vault `~/.yzel/store.db`. Ключ лежит рядом в `~/.yzel/vault.key` или задаётся через `YZEL_KEY`, так что копия папки `~/.yzel/` открывает и данные. Ничего не отправляется в облако. / Credentials are stored encrypted (Fernet: AES-128 + HMAC-SHA256) in a local SQLite vault at `~/.yzel/store.db`. The key sits next to it in `~/.yzel/vault.key` or comes from `YZEL_KEY`, so a copy of the `~/.yzel/` folder opens the data too. Nothing goes to a cloud.
 
 Для 1С вместо vault можно задать переменные окружения, они имеют приоритет / For 1C, env vars can replace the vault and take precedence: `YZEL_1C_URL`, `YZEL_1C_USERNAME`, `YZEL_1C_PASSWORD` (пароль может быть пустым / the password may be empty).
 
 Чтобы скрыть и запретить все инструменты записи, задайте `YZEL_READ_ONLY=1` / To hide and refuse every write tool, set `YZEL_READ_ONLY=1`.
+
+Каждая запись возвращает `outcome`: `applied`, `rejected`, `not_sent`, `may_have_applied`, `duplicate_refused` или `refused`. Повтор того же create после неясного ответа отклоняется 10 минут, чтобы документ не создался дважды. / Every write returns an `outcome`. An identical create after an unclear result is refused for 10 minutes, so a document is not created twice. См. / See [`docs/specs/write-safety.md`](docs/specs/write-safety.md).
 
 ### 2. Подключите к Claude Desktop / Wire into Claude Desktop
 
@@ -167,7 +169,7 @@ yzel config list
 
 Каждая 1С-инсталляция уникальна. Что делает коннектор:
 
-- **Находит схему сам.** На старте парсится `$metadata`: коннектор узнаёт доступные справочники, документы, регистры, включая кастомные.
+- **Находит схему сам.** При первом вызове `onec_list_entities` или `onec_schema` парсится `$metadata`: коннектор узнаёт доступные справочники, документы, регистры, включая кастомные.
 - **Кириллические имена как есть.** `Catalog_Номенклатура` остаётся `Catalog_Номенклатура`, без транслитерации.
 - **Streaming-парсинг `$metadata`.** Конфигурации ERP могут давать 10+ МБ XML. Yzel не загружает всё в память.
 - **Сам различает 1С:Fresh и on-prem.** Разные форматы адреса (`1cfresh.com/a/sbm/<id>/odata/` и `<host>/<base>/odata/`) обрабатываются без настройки.
@@ -203,21 +205,26 @@ In English:
 ## Архитектура / Architecture
 
 ```
-~/.yzel/store.db       ← зашифрованные credentials (AES-256)
-       │
-       ├── Yzel CLI     ← добавление/удаление подключений
-       │
-       └── MCP-серверы  ← по одному на коннектор
-           ├── 1C (OData v3, Cyrillic-aware, streaming $metadata)
-           ├── Wildberries (5 хостов, per-host rate limits)
-           ├── Ozon (dual-header auth, sandbox support)
-           ├── Bitrix24 (webhook, leaky-bucket 2 req/sec)
-           ├── AmoCRM (OAuth2 + 3mo refresh-staleness guard)
-           ├── Moysklad (Bearer, rate limiter, expand-aware)
-           ├── Telegram (retry_after handling)
-           └── iiko (apiLogin → 1h Bearer, auto-refresh)
-                    │
-                    └── Claude / ChatGPT / любой MCP-клиент
+Yzel CLI  ──→  ~/.yzel/store.db   ← зашифрованные credentials (Fernet), ключ в vault.key
+                     │
+YZEL_1C_* env  ──────┤            ← для 1С env имеет приоритет; так их передаёт .mcpb
+                     │
+                     ▼
+                   core           ← виды инструментов, YZEL_READ_ONLY,
+                     │               write runner: outcome + 10-мин защита от дублей
+                     ▼
+               MCP-серверы        ← по одному на коннектор
+                ├── 1C (OData v3, Cyrillic-aware, $metadata по запросу, streaming)
+                ├── Wildberries (5 хостов, per-host rate limits)
+                ├── Ozon (dual-header auth, sandbox support)
+                ├── Bitrix24 (webhook, leaky-bucket 2 req/sec)
+                ├── AmoCRM (OAuth2 + 3mo refresh-staleness guard)
+                ├── Moysklad (Bearer, rate limiter, expand-aware)
+                ├── Telegram (retry_after handling)
+                └── iiko (apiLogin → 1h Bearer, auto-refresh)
+                     │
+                     ▼
+               Claude / ChatGPT / любой MCP-клиент
 ```
 
 Каждый коннектор:

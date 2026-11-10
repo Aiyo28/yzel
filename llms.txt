@@ -10,7 +10,7 @@ returns "Неизвестный инструмент" for anything unrecognised.
 ## What this is
 
 A Python package exposing eight independent MCP servers, one per business system. Each runs over
-stdio. Credentials are held locally, AES-256-GCM encrypted, in `~/.yzel/store.db`; the key is
+stdio. Credentials are held locally, Fernet-encrypted (AES-128 + HMAC-SHA256), in `~/.yzel/store.db`; the key is
 `$YZEL_KEY` or a generated `~/.yzel/vault.key`. Nothing is sent anywhere but the configured
 service. Requires Python 3.11+. Works on Windows without WSL.
 

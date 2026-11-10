@@ -14,7 +14,7 @@ already notified that vendor.
 Yzel holds credentials for business systems that contain real commercial and personal data.
 Treat any credential-handling bug as high severity.
 
-- **Credentials at rest.** AES-256-GCM encrypted in a local SQLite database at `~/.yzel/store.db`.
+- **Credentials at rest.** Fernet-encrypted (AES-128-CBC + HMAC-SHA256) in a local SQLite database at `~/.yzel/store.db`.
   The key comes from the `YZEL_KEY` environment variable, or is generated at `~/.yzel/vault.key`
   on first run. **Nothing is transmitted anywhere except to the configured service.**
 - **No telemetry.** Yzel makes no network call other than to the service you configured.
