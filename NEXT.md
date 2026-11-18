@@ -69,7 +69,7 @@ Wildberries and Ozon; 21 of 68 tools mutate production state.
   Publication needs Configurator or tenant-admin rights that trials do not grant. This needs an
   on-prem infobase or a paid Fresh tenant — an acquisition task. It sat as an open checkbox from
   2026-04-24 to 2026-09-05 because it was filed as pending rather than blocked.
-- Owner is asking ODAS for read-only access to a live 1С:Бухгалтерия (2026-09-05). Parked until
+- Owner is seeking read-only access to a live 1С:Бухгалтерия (2026-09-05). Parked until
   that lands.
 
 ### 5. Connector roadmap — `ROADMAP.md`
